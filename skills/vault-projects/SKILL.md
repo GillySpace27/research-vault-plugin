@@ -1,6 +1,6 @@
 ---
 name: vault-projects
-description: Project model for the research vault — one `.md` file per project, listed in `projects.md`. Use when deciding which file a task belongs in, creating a new project file, or interpreting the user's project codenames. The user's actual project list and any codenames live in `projects.md` and the vault `CLAUDE.md` hot cache — read those for the live roster.
+description: Project model for the research vault — one `.md` file per project, listed in `projects.md`. Use whenever a task or new line of work needs routing to (or creating as) a project file, or when the user refers to a project by a short codename or acronym. The user's actual project list and codenames live in `projects.md` and the vault `CLAUDE.md` hot cache — read those for the live roster.
 ---
 
 # Vault projects

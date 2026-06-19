@@ -28,10 +28,12 @@ creates it and interviews you to seed it.**
 If the vault has no `projects.md`, treat it as first-run. Do this:
 
 **a) Create the folder and skeleton.** Make the vault directory, plus
-`daily_notes/`, `memory/people/`, `memory/projects/`, `memory/context/`, and
-copy `_templates/project.md`, `_templates/daily-note.md`, and
-`_templates/glossary.md` from `${CLAUDE_PLUGIN_ROOT}/_templates/` into the
-vault's `_templates/` and `memory/glossary.md`.
+`daily_notes/`, `memory/people/`, `memory/projects/`, `memory/context/`. Then:
+
+- Copy `_templates/project.md` and `_templates/daily-note.md` from
+  `${CLAUDE_PLUGIN_ROOT}/_templates/` into the vault's own `_templates/`.
+- Separately, seed `memory/glossary.md` by copying
+  `${CLAUDE_PLUGIN_ROOT}/_templates/glossary.md`.
 
 **b) Interview the user** (keep it short — 4 quick questions, accept "skip"):
 
@@ -58,15 +60,17 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
   the user named, alphabetical.
 - **One `<project>.md`** per named project, scaffolded from
   `_templates/project.md`, with the Status line and a People stub filled.
-- **`inbox.md`**, **`README.md`**, **`dashboard.md`** (Obsidian Tasks queries),
-  **`journaling.md`**, **`proposal-solicitations.md`**, **`proposal-ideas.md`**,
-  **`personal.md`** — minimal starters. Models for each live in
-  `_examples/` in the plugin.
-- **`memory/glossary.md`** — add the codenames/acronyms the user gave.
+- **Starter files copied verbatim** from `${CLAUDE_PLUGIN_ROOT}/_templates/`
+  into the vault root (these ship as real templates — copy, don't improvise):
+  `inbox.md`, `personal.md`, `dashboard.md`, `journaling.md`,
+  `proposal-solicitations.md`, `proposal-ideas.md`, and `vault-README.md`
+  (write it to the vault as `README.md`).
+- **`memory/glossary.md`** — append the codenames/acronyms the user gave to
+  the glossary already seeded in step (a).
 - **`memory/people/<handle>.md`** — one per collaborator named.
-- Also add the top collaborators to the **vault-people skill roster table** is
-  NOT possible (the skill is read-only inside the plugin) — instead, the
-  roster lives in the vault `CLAUDE.md` hot cache. Keep it there.
+- The roster lives in the vault `CLAUDE.md` hot cache (the `vault-people`
+  skill is read-only and points there) — keep the People table there, not in
+  the plugin.
 
 Report everything created.
 

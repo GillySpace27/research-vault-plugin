@@ -1,6 +1,12 @@
 {
   "name": "research-vault-local",
-  "description": "Single-plugin marketplace for the research-vault plugin.",
+  "owner": {
+    "name": "Chris Gilly",
+    "url": "https://github.com/GillySpace27"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace for the research-vault plugin."
+  },
   "plugins": [
     {
       "name": "research-vault",

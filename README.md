@@ -37,6 +37,28 @@ On first run, `/start` asks where the vault should live (default
 short interview to seed your roster, projects, and glossary. Nothing leaves
 your machine.
 
+New to it? **[GETTING-STARTED.md](GETTING-STARTED.md)** is the first-hour
+walkthrough.
+
+### Prerequisites
+
+- **Claude Code** — required.
+- **Python 3.7+** — only for `/dashboard` (the HTML board). The vault itself
+  works without it.
+- **Obsidian** (+ the Tasks plugin) — optional; makes `dashboard.md` a live
+  board and renders the emoji metadata.
+- **MCP connectors** — optional; only power `/update --comprehensive`.
+
+### Vault location
+
+By default the vault lives at `~/research-vault/`. To use a fixed location
+elsewhere, either pass it (`/start /path/to/vault`) or set an environment
+variable so `/start` and `/dashboard` find it automatically:
+
+```bash
+export RESEARCH_VAULT_DIR=~/path/to/vault
+```
+
 ## Commands
 
 | Command | What it does |
@@ -76,6 +98,9 @@ conventions so future sessions don't need to be re-briefed.
 ├── projects.md          ← project manifest
 ├── journaling.md        ← daily journal guidelines
 ├── inbox.md             ← capture catch-all
+├── personal.md          ← non-work
+├── proposal-solicitations.md  ← funding calls (read by /status)
+├── proposal-ideas.md          ← idea-first proposal capture
 ├── <project>.md         ← one per project
 ├── daily_notes/YYYY-MM-DD.md
 ├── memory/              ← two-tier memory (hot cache lives in CLAUDE.md)
@@ -83,7 +108,7 @@ conventions so future sessions don't need to be re-briefed.
 │   ├── people/<name>.md
 │   ├── projects/<name>.md
 │   └── context/
-└── _templates/          ← project.md, daily-note.md
+└── _templates/          ← project.md, daily-note.md, glossary.md, dashboard.md, …
 ```
 
 The `_examples/` folder in the plugin shows the intended shape of a filled-in
@@ -103,3 +128,29 @@ only power `/update --comprehensive`.
 The vault is plain markdown, so it opens in any editor. If you use Obsidian
 with the Tasks plugin, the emoji metadata (📅 ⏳ ✅ 🔼 🔽) renders as real
 task properties and `dashboard.md`'s queries become a live board.
+
+## Troubleshooting
+
+- **`/dashboard` fails** — you need Python 3.7+ on `PATH`. The vault works fully
+  without it; `dashboard.md` in Obsidian is the live view.
+- **`/update --comprehensive` skips sources** — those MCP connectors aren't
+  authenticated. That's fine; it uses whatever is connected and notes the gaps.
+- **`/start` can't find the vault** — pass the path (`/start /path/to/vault`) or
+  set `RESEARCH_VAULT_DIR`. `/start` is idempotent; re-running it never
+  overwrites existing files.
+- **A task landed in the wrong file** — tell Claude to move it, or run `/triage`.
+
+## Uninstall
+
+```
+/plugin uninstall research-vault@research-vault-local
+```
+
+Your vault folder is independent of the plugin — uninstalling never touches
+your data.
+
+## Maintaining / development
+
+This repo is the upstream source of truth for the engine. To make changes or
+run a personal fork that shares the engine, see **[CONTRIBUTING.md](CONTRIBUTING.md)**
+(the two-repo model and `scripts/sync-engine.sh` workflow).

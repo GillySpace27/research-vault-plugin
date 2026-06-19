@@ -1,6 +1,6 @@
 ---
 name: vault-status
-description: Six-bucket status grouping for the user's proposals and projects. Use whenever they ask "what is the status of my proposals/projects", "where do things stand", or any variant. Sort and group into Untouched → Proposal Idea Scoped → Drafting Currently → Submitted and Pending → Awarded → Complete (or otherwise no further work). Show every category even if empty. The live proposal list lives in `proposal-solicitations.md`.
+description: Six-bucket status grouping for the user's proposals and projects. Use whenever the user asks "what is the status of my proposals/projects", "where do things stand", or any variant. Sort and group into Untouched → Proposal Idea Scoped → Drafting Currently → Submitted and Pending → Awarded → Complete (or otherwise no further work). Show every category even if empty. The live proposal list lives in `proposal-solicitations.md`.
 ---
 
 # Vault status

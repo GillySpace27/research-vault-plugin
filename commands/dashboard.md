@@ -1,5 +1,6 @@
 ---
 description: Regenerate the interactive `dashboard.html` from the current vault. Runs `scripts/build_dashboard.py`, which parses every project `.md` file (skipping README/CLAUDE/projects/journaling/dashboard scaffolding) and renders a filterable board.
+argument-hint: "[vault path]"
 ---
 
 # /dashboard
@@ -12,10 +13,13 @@ Build (or rebuild) the static interactive dashboard for the vault.
    `RESEARCH_VAULT_DIR` environment variable (`echo $RESEARCH_VAULT_DIR`); else
    the `**Vault path:**` recorded in a loaded vault `CLAUDE.md`; else
    `~/research-vault/`.
-2. Run:
+2. Run (use `python3`; fall back to `python` only if `python3` is absent):
    ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/build_dashboard.py" "<vault path>"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_dashboard.py" "<vault path>"
    ```
+   Requires Python 3.7+. If no Python 3 is installed, tell the user the vault
+   still works fully without `/dashboard` — `dashboard.md` in Obsidian is the
+   live view.
 3. Report the written file path and the open/done/file counts the script
    prints.
 4. Tell the user to open `dashboard.html` in any browser. Don't `open` it

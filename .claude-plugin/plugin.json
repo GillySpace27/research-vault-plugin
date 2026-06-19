@@ -1,5 +1,13 @@
 {
   "name": "research-vault",
   "version": "0.1.0",
-  "description": "A plain-markdown research-task vault: one file per project, Obsidian-Tasks emoji syntax, a daily journal, six-bucket proposal/project status, and a two-tier memory of people/projects/terms. Mirrors the capabilities of the Anthropic productivity plugin without flattening to a single TASKS.md. Bring your own people and projects — /start interviews you and seeds the vault."
+  "description": "A plain-markdown research-task vault: one file per project, Obsidian-Tasks emoji syntax, a daily journal, six-bucket proposal/project status, and a two-tier memory of people/projects/terms. Mirrors the capabilities of the Anthropic productivity plugin without flattening to a single TASKS.md. Bring your own people and projects — /start interviews you and seeds the vault.",
+  "author": {
+    "name": "Chris Gilly",
+    "url": "https://github.com/GillySpace27"
+  },
+  "homepage": "https://github.com/GillySpace27/research-vault-plugin",
+  "repository": "https://github.com/GillySpace27/research-vault-plugin",
+  "license": "MIT",
+  "keywords": ["tasks", "research", "notes", "obsidian", "productivity", "vault"]
 }
