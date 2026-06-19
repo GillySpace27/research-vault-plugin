@@ -44,8 +44,9 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
    your machine)
 2. Your 3–8 most frequent collaborators — name, affiliation, what you work on
    together. I'll coin #firstname-lastname handles.
-3. Your active projects/proposals — a short name + one line each. I'll make one
-   file per project.
+3. Your active projects — a short name + one line each. I'll make one file per
+   project. Flag any that are grant proposals and their stage (idea / drafting /
+   submitted / awarded) so I can also seed your proposal trackers.
 4. Any codenames or acronyms you use that I should know? (e.g. "the storefront"
    = a specific app)
 ```
@@ -64,7 +65,10 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
   into the vault root (these ship as real templates — copy, don't improvise):
   `inbox.md`, `personal.md`, `dashboard.md`, `journaling.md`,
   `proposal-solicitations.md`, `proposal-ideas.md`, and `vault-README.md`
-  (write it to the vault as `README.md`).
+  (write it to the vault as `README.md`). If the user flagged any project as a
+  proposal in Q3, add an entry for it to `proposal-solicitations.md` (with its
+  `Status:` stage) or `proposal-ideas.md` (if idea-first), so the first
+  `/status` is coherent rather than empty.
 - **`memory/glossary.md`** — append the codenames/acronyms the user gave to
   the glossary already seeded in step (a).
 - **`memory/people/<handle>.md`** — one per collaborator named.
