@@ -1,0 +1,11 @@
+{
+  "name": "research-vault-local",
+  "description": "Single-plugin marketplace for the research-vault plugin.",
+  "plugins": [
+    {
+      "name": "research-vault",
+      "description": "Plain-markdown research-task vault: one .md per project, Obsidian Tasks emoji syntax, daily journal, six-bucket proposal status, two-tier memory. Bring your own people/projects.",
+      "source": "./"
+    }
+  ]
+}
