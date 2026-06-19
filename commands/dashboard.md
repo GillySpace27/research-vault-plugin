@@ -8,9 +8,10 @@ Build (or rebuild) the static interactive dashboard for the vault.
 
 ## Instructions
 
-1. Resolve the vault path: if `$ARGUMENTS` is non-empty and a directory, use
-   that. Otherwise read the vault path recorded in the vault `CLAUDE.md` hot
-   cache (set at `/start`), falling back to `~/research-vault/`.
+1. Resolve the vault path, in order: `$ARGUMENTS` if it's a directory; else the
+   `RESEARCH_VAULT_DIR` environment variable (`echo $RESEARCH_VAULT_DIR`); else
+   the `**Vault path:**` recorded in a loaded vault `CLAUDE.md`; else
+   `~/research-vault/`.
 2. Run:
    ```bash
    python "${CLAUDE_PLUGIN_ROOT}/scripts/build_dashboard.py" "<vault path>"

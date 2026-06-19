@@ -14,8 +14,10 @@ creates it and interviews you to seed it.**
 ### 1. Locate the vault
 
 - If `$ARGUMENTS` is non-empty and a directory, treat it as the vault path.
-- Else check the vault `CLAUDE.md` hot cache (if a vault was set up before) for
-  a recorded path.
+- Else if the `RESEARCH_VAULT_DIR` environment variable is set
+  (`echo $RESEARCH_VAULT_DIR`), use that.
+- Else, if a vault `CLAUDE.md` is already loaded in context, use the
+  `**Vault path:**` it records.
 - Else default to `~/research-vault/`.
 - If the path doesn't exist, this is **first-run** — confirm the location with
   the user ("I'll create your vault at `~/research-vault/` — ok, or somewhere
