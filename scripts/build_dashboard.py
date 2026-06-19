@@ -10,13 +10,14 @@ filters: due/overdue, this week, high priority, inbox, by-project.
 Usage:
     python build_dashboard.py [vault_path]
 
-Defaults to ~/research-vault/.
+Vault path resolution: explicit arg, else $RESEARCH_VAULT_DIR, else ~/research-vault/.
 """
 from __future__ import annotations
 
 import datetime as dt
 import html
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -71,7 +72,7 @@ def walk_vault(vault: Path) -> dict[str, list[dict]]:
         if md.name in SKIP_FILES:
             continue
         tasks: list[dict] = []
-        for i, line in enumerate(md.read_text().splitlines(), 1):
+        for i, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
             parsed = parse_task(line)
             if parsed is None:
                 continue
@@ -163,7 +164,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <footer>
   Read-only view. Edits go through Obsidian, your editor, or
   <code>/capture</code> / <code>/journal</code> / <code>/update</code>.
-  Regenerate with <code>python scripts/build_dashboard.py</code>.
+  Regenerate with <code>/dashboard</code> (or <code>python3 scripts/build_dashboard.py PATH</code>).
 </footer>
 <script>
 const DATA = {data_json};
@@ -200,7 +201,7 @@ function render(filter) {{
     total += shown.length;
     const sec = document.createElement("section");
     sec.className = "file";
-    sec.innerHTML = `<h2>${{file}}</h2>`;
+    sec.innerHTML = `<h2>${{escapeHtml(file)}}</h2>`;
     const ul = document.createElement("ul");
     for (const t of shown) {{
       const li = document.createElement("li");
@@ -253,7 +254,14 @@ render("open");
 
 
 def main(argv: list[str]) -> int:
-    vault = Path(argv[1]) if len(argv) > 1 else Path.home() / "research-vault"
+    # Vault path resolution mirrors the /start and /dashboard commands:
+    # explicit arg, then the RESEARCH_VAULT_DIR env var, then a generic default.
+    if len(argv) > 1:
+        vault = Path(argv[1])
+    elif os.environ.get("RESEARCH_VAULT_DIR"):
+        vault = Path(os.environ["RESEARCH_VAULT_DIR"]).expanduser()
+    else:
+        vault = Path.home() / "research-vault"
     if not vault.is_dir():
         print(f"vault not found: {vault}", file=sys.stderr)
         return 1
@@ -261,14 +269,16 @@ def main(argv: list[str]) -> int:
     open_count = sum(1 for ts in by_file.values() for t in ts if not t["done"])
     done_count = sum(1 for ts in by_file.values() for t in ts if t["done"])
     out = HTML_TEMPLATE.format(
-        data_json=json.dumps(by_file),
+        # Escape "<"/">" so a task containing a literal "</script>" can't
+        # terminate the embedded <script> block early (json.dumps leaves them raw).
+        data_json=json.dumps(by_file).replace("<", "\\u003c").replace(">", "\\u003e"),
         today=dt.date.today().isoformat(),
         generated=dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
         open_count=open_count,
         done_count=done_count,
     )
     target = vault / "dashboard.html"
-    target.write_text(out)
+    target.write_text(out, encoding="utf-8")
     print(f"wrote {target} ({open_count} open, {done_count} done across {len(by_file)} files)")
     return 0
 
