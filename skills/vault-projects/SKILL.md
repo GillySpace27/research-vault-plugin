@@ -5,14 +5,18 @@ description: Project model for the research vault — one `.md` file per project
 
 # Vault projects
 
-Each substantive line of work gets its own file under the vault root. The
-canonical list — with one-line descriptions of each — lives in `projects.md`.
-Read that file first when you need to know what exists.
+Each substantive line of work gets its own `.md` file. New project files go in
+`projects/` (or another subfolder that fits the work); the tools locate project
+files anywhere in the vault, so the exact folder is your choice and a flat
+layout works too. The canonical list — with one-line descriptions of each —
+lives in `projects.md` at the vault root. Read that file first when you need to
+know what exists.
 
 ## Operating principles
 
 1. **One file per project.** Grants, papers, ongoing projects each get their
-   own `.md` file. Tasks live inside the project they belong to.
+   own `.md` file (in `projects/` or another subfolder). Tasks live inside the
+   project they belong to.
 2. **`inbox.md` is the catch-all** for capture and triage.
 3. **Standard sections:** `## Open`, `## Done`, `## Notes`. Some files also
    have `## On hold`, `## Open questions`, `## People`. Keep section names
