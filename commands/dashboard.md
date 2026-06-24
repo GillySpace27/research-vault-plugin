@@ -1,5 +1,5 @@
 ---
-description: Regenerate the interactive `dashboard.html` from the current vault. Runs `scripts/build_dashboard.py`, which parses every project `.md` file (skipping README/CLAUDE/projects/journaling/dashboard scaffolding) and renders a filterable board.
+description: Regenerate the interactive `dashboard.html` from the current vault. Runs `scripts/build_dashboard.py`, which scans the vault recursively for project `.md` files (skipping README/CLAUDE/projects/journaling/dashboard scaffolding and the memory/daily_notes/_templates folders), groups them by folder, and renders a filterable board.
 argument-hint: "[vault path]"
 ---
 

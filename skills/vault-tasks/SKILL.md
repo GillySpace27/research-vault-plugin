@@ -38,8 +38,9 @@ Examples:
 
 ## Where tasks live
 
-- **One file per project.** `<project>.md` for each line of work. The project
-  manifest is `projects.md`. (See vault-projects skill.)
+- **One file per project.** `<project>.md` for each line of work, in `projects/`
+  or any subfolder (the tools find them anywhere). The project manifest is
+  `projects.md` at the vault root. (See vault-projects skill.)
 - **`inbox.md` is the catch-all.** Drop here when the right project is unclear
   or the task is genuinely cross-cutting.
 - **`personal.md`** for non-work.

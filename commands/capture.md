@@ -34,9 +34,12 @@ Pick the single most likely file based on:
 - People mentioned (cross-reference vault-people roster).
 - Topic keywords.
 
-If two or more files are roughly equally likely, default to **`inbox.md`** —
-the user can route it later via `/triage`. Don't ask a question for a 10-second
-capture; just note the routing decision in the report.
+Project files may live in subfolders (e.g. `projects/`); use the path recorded
+in `projects.md`. If the task clearly belongs to a brand-new project, create
+`projects/<name>.md` from `_templates/project.md` rather than adding it at the
+root. If two or more files are roughly equally likely, default to **`inbox.md`**
+(at the vault root) — the user can route it later via `/triage`. Don't ask a
+question for a 10-second capture; just note the routing decision in the report.
 
 ### 4. Append
 

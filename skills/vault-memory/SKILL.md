@@ -74,8 +74,8 @@ collaborator:
 
 3. **Project background:**
    - Create or update `memory/projects/<name>.md` for project *context*
-     (history, why it matters, key tradeoffs). The task spine stays in
-     `<name>.md` at the vault root.
+     (history, why it matters, key tradeoffs). The task spine stays in the
+     project's own `<name>.md` (in `projects/` or wherever it lives).
    - Add codename + filename to glossary.
 
 4. **Preference:**

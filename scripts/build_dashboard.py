@@ -25,6 +25,8 @@ from pathlib import Path
 SKIP_FILES = {
     "README.md", "CLAUDE.md", "dashboard.md", "journaling.md", "projects.md",
 }
+# Directories that never hold project task files (so recursion skips them).
+SKIP_DIRS = {".git", ".obsidian", "_templates", "memory", "daily_notes"}
 EMOJI_DUE = "\U0001f4c5"        # 📅
 EMOJI_SCHED = "⏳"           # ⏳
 EMOJI_DONE = "✅"            # ✅
@@ -67,20 +69,29 @@ def parse_task(line: str) -> dict | None:
 
 
 def walk_vault(vault: Path) -> dict[str, list[dict]]:
+    # Folder-agnostic: recurse the whole vault, skip non-project dirs and the
+    # system/index files, and key results by vault-relative POSIX path so the
+    # dashboard clusters by folder. A flat vault is just the no-subfolder case.
     by_file: dict[str, list[dict]] = {}
-    for md in sorted(vault.glob("*.md")):
+    paths = []
+    for md in vault.rglob("*.md"):
+        rel = md.relative_to(vault)
+        if any(part in SKIP_DIRS for part in rel.parts[:-1]):
+            continue
         if md.name in SKIP_FILES:
             continue
+        paths.append((rel.as_posix(), md))
+    for key, md in sorted(paths):
         tasks: list[dict] = []
         for i, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
             parsed = parse_task(line)
             if parsed is None:
                 continue
-            parsed["file"] = md.name
+            parsed["file"] = key
             parsed["line"] = i
             tasks.append(parsed)
         if tasks:
-            by_file[md.name] = tasks
+            by_file[key] = tasks
     return by_file
 
 
