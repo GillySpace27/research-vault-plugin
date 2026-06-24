@@ -56,6 +56,7 @@ EXCLUDES=(
   --exclude='GETTING-STARTED.md'
   --exclude='.DS_Store'
   --exclude='__pycache__/'
+  --exclude='docs/superpowers/'
 )
 
 RSYNC_FLAGS=(-a --delete --itemize-changes "${EXCLUDES[@]}")
