@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the companion PDF of docs/USER-GUIDE.md (the markdown is the source of
+"""Build the companion PDF of USER-GUIDE.md (the markdown is the source of
 truth; this renders a print/email-friendly version with native diagrams).
 
     pip install reportlab
-    python docs/build-user-guide-pdf.py [output.pdf]   # defaults to docs/USER-GUIDE.pdf
+    python scripts/build-user-guide-pdf.py [output.pdf]   # defaults to ./USER-GUIDE.pdf
 """
 import html, os, sys
 from reportlab.lib.pagesizes import letter
@@ -23,8 +23,8 @@ BOXBG  = colors.HexColor("#fbf1e8")   # warm tint for diagram nodes
 BOXBD  = colors.HexColor("#e3b489")
 ARROW  = colors.HexColor("#b25600")
 
-_here = os.path.dirname(os.path.abspath(__file__))
-out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_here, "USER-GUIDE.pdf")
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (scripts/..)
+out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_root, "USER-GUIDE.pdf")
 
 doc = SimpleDocTemplate(out, pagesize=letter, leftMargin=0.9*inch, rightMargin=0.9*inch,
                         topMargin=0.85*inch, bottomMargin=0.75*inch,

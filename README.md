@@ -16,6 +16,10 @@ none of which fit the single-`TASKS.md` model.
 data. `/start` creates the vault and interviews you to seed your own people,
 projects, and memory.
 
+**Documentation:** [GETTING-STARTED.md](GETTING-STARTED.md) — install and your
+first hour · [USER-GUIDE.md](USER-GUIDE.md) — what it does and how to use it
+(mental model, the daily loop, diagrams).
+
 ## Install
 
 ```

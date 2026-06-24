@@ -1,6 +1,6 @@
 # The research-vault user guide
 
-*What the system is, the mental model behind it, and how to use it day to day. For installation, see [GETTING-STARTED.md](../GETTING-STARTED.md); for the quick command and syntax reference, see the appendices at the end.*
+*What the system is, the mental model behind it, and how to use it day to day. For installation, see [GETTING-STARTED.md](GETTING-STARTED.md); for the quick command and syntax reference, see the appendices at the end.*
 
 ---
 
