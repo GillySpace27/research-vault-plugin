@@ -57,10 +57,12 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
   a People table (top collaborators), an Active projects list, a Preferences
   section, and the recorded vault path. Use the `_examples/vault-CLAUDE.example.md`
   shape in the plugin as the model.
-- **`projects.md`** — one `**NAME** (`file.md`) — one-line summary.` per project
-  the user named, alphabetical.
-- **One `<project>.md`** per named project, scaffolded from
-  `_templates/project.md`, with the Status line and a People stub filled.
+- **`projects.md`** (at the vault root) — one `**NAME** (`projects/file.md`) — one-line summary.`
+  per project the user named, alphabetical.
+- **One `projects/<project>.md`** per named project (create the `projects/`
+  folder), scaffolded from `_templates/project.md`, with the Status line and a
+  People stub filled. The dashboard and the other commands locate project files
+  anywhere in the vault, so a subfolder keeps the root uncluttered.
 - **Starter files copied verbatim** from `${CLAUDE_PLUGIN_ROOT}/_templates/`
   into the vault root (these ship as real templates — copy, don't improvise):
   `inbox.md`, `personal.md`, `dashboard.md`, `journaling.md`,

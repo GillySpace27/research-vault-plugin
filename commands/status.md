@@ -17,9 +17,11 @@ Render the six-bucket status grouping defined by the vault-status skill.
 
 ## Instructions
 
-1. Read `projects.md` for the project list.
-2. Read `proposal-solicitations.md` and `proposal-ideas.md`.
-3. Read the `**Status:**` line at the top of each project file.
+1. Read `projects.md` for the project list (it records each file's path, which
+   may be in a subfolder such as `projects/` or `proposals/`).
+2. Read `proposal-solicitations.md` and `proposal-ideas.md` (at the vault root,
+   or under `proposals/` — use the path from `projects.md`).
+3. Read the `**Status:**` line at the top of each project file, wherever it lives.
 4. Classify each into a bucket using the heuristics in the vault-status skill.
 5. Render every bucket — `(none)` for empty ones — in the order defined by
    the skill.

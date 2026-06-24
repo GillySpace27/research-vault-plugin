@@ -39,8 +39,8 @@ For each confirmed move:
 - **Delete**: remove from `inbox.md`. If it was checked-off (`- [x]`), leave
   it under `## Done`.
 - **Defer**: leave in `inbox.md`. Log a short note next session.
-- **New project**: scaffold from `_templates/project.md`, add entry to
-  `projects.md`, move the task into the new file.
+- **New project**: scaffold `projects/<name>.md` from `_templates/project.md`,
+  add an entry (with its path) to `projects.md`, move the task into the new file.
 
 ### 4. Surgical edits
 

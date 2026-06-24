@@ -12,7 +12,9 @@ See the vault-update skill for the full logic; this file is the entry point.
 
 Run the steps in the vault-update skill, default section:
 
-1. Identify scope — every project file the recent conversation touches.
+1. Identify scope — every project file the recent conversation touches
+   (project files may live in subfolders such as `projects/`; locate them via
+   `projects.md`, not by assuming the vault root).
 2. Reconcile each affected file (status line, ## Open, ## On hold, ## Done,
    ## Notes, ## People, dates).
 3. Append a `## Work log` bullet to today's `daily_notes/YYYY-MM-DD.md` for
