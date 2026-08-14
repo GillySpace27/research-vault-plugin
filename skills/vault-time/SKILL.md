@@ -25,9 +25,14 @@ never estimate hours from memory** - run the script, quote the script.
 
 It is **presence time at the keyboard, per project**, not certified effort:
 
-- A minute where two projects were open bills half to each, so the per-project
-  column always sums to real wall-clock time. The unsplit `Raw` column stays
-  visible so the overlap is auditable, not silent.
+- A minute claimed by two projects at once is split in proportion to weight, so
+  the per-project column always sums to real wall-clock time. The unsplit `Raw`
+  column stays visible so the overlap is auditable, not silent.
+- **A meeting outweighs a concurrent session** (`meeting_weight`, 3 by default:
+  75/25 against one session). Being in the room is the stronger claim on the
+  hour; whatever the keyboard was doing was secondary. Rows whose source is in
+  `meeting_sources` (calendar, phone) get that weight; a sixth TSV column
+  overrides it for one row.
 - Thinking, reading on paper, and hallway conversation are invisible to it.
   They belong in `events.tsv` if they matter.
 - An idle browser window is invisible to it too, which is the point.
@@ -88,7 +93,9 @@ Slack messages, or calendar events tied to a vault project, append a row to
 ```
 2026-08-13T14:05	PUNCH PULSE	6	gmail	reply to Cherilynn re: dome poll
 2026-08-13T15:00	HFR Coronal Heating	30	calendar	Step-2 sync with Mari Paz
+2026-08-13T16:00	DKIST waves	180	calendar	group meeting, ran long	1.5
 ```
+The optional sixth column is the weight, for a meeting you were only half in.
 
 Rules:
 

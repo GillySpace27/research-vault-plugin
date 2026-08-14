@@ -46,6 +46,8 @@ DEFAULT_CONFIG = {
     "idle_gap_minutes": 10,
     "min_segment_minutes": 2,
     "default_event_minutes": 6,
+    "meeting_weight": 3.0,
+    "meeting_sources": ["calendar", "phone"],
     "pay_period": "semi-monthly",
     "pay_period_anchor": "2026-01-05",
     "round_to_hours": 0.25,
@@ -105,7 +107,7 @@ def parse_ts(raw):
 
 
 def scan_transcripts(cfg, lo, hi):
-    """Return [(start, end, dir_key)] of active segments overlapping [lo, hi)."""
+    """Return [(start, end, dir_key, weight)] of active segments overlapping [lo, hi)."""
     gap = timedelta(minutes=cfg["idle_gap_minutes"])
     floor = timedelta(minutes=cfg["min_segment_minutes"])
     out = []
@@ -133,7 +135,7 @@ def scan_transcripts(cfg, lo, hi):
             if ts is None or ts - prev > gap:
                 end = max(prev, seg_start + floor)
                 if end > lo and seg_start < hi:
-                    out.append((max(seg_start, lo), min(end, hi), key))
+                    out.append((max(seg_start, lo), min(end, hi), key, 1.0))
                 if ts is not None:
                     seg_start = ts
             prev = ts if ts is not None else prev
@@ -141,10 +143,15 @@ def scan_transcripts(cfg, lo, hi):
 
 
 def load_events(cfg, lo, hi):
-    """time_tracking/events.tsv: ISO8601 <TAB> project <TAB> minutes <TAB> source <TAB> note.
+    """time_tracking/events.tsv: ISO8601 <TAB> project <TAB> minutes <TAB> source <TAB> note
+    <TAB> weight.
 
     'project' is a dir-key or a project label; labels are passed through as-is.
     Blank/short lines and '#' comments are ignored.
+
+    A row from a meeting source outweighs concurrent session activity: you were
+    in the room, and whatever the keyboard was doing was secondary. The optional
+    sixth column overrides the weight for one row.
     """
     path = os.path.join(VAULT, EVENTS_REL)
     out = []
@@ -172,9 +179,16 @@ def load_events(cfg, lo, hi):
                     mins = float(parts[2])
                 except ValueError:
                     pass
+            source = parts[3].strip().lower() if len(parts) > 3 else ""
+            weight = cfg["meeting_weight"] if source in cfg["meeting_sources"] else 1.0
+            if len(parts) > 5 and parts[5].strip():
+                try:
+                    weight = float(parts[5])
+                except ValueError:
+                    pass
             end = start + timedelta(minutes=mins)
             if end > lo and start < hi:
-                out.append((max(start, lo), min(end, hi), parts[1].strip()))
+                out.append((max(start, lo), min(end, hi), parts[1].strip(), weight))
     return out
 
 
@@ -184,21 +198,24 @@ def load_events(cfg, lo, hi):
 def allocate(intervals, lo, hi):
     """Minute-resolution sweep. Returns (normalized, raw, wall_minutes).
 
-    A minute worked in two projects at once bills half to each (normalized), so
-    the per-project column always sums to real wall-clock time. 'raw' keeps the
-    unsplit per-project totals so the overlap is visible rather than silent.
+    A minute claimed by two projects at once is split between them in proportion
+    to their weights, so the per-project column always sums to real wall-clock
+    time. Sessions weigh 1 and meetings weigh `meeting_weight` (3 by default,
+    i.e. 75/25 against one concurrent session). 'raw' keeps the unsplit
+    per-project totals so the overlap is visible rather than silent.
     """
     span = int((hi - lo).total_seconds() // 60)
-    active = defaultdict(set)
-    for start, end, key in intervals:
+    active = defaultdict(dict)
+    for start, end, key, weight in intervals:
         a = max(0, int((start - lo).total_seconds() // 60))
         b = min(span, int(-(-(end - lo).total_seconds() // 60)))
         for m in range(a, b):
-            active[m].add(key)
+            active[m][key] = max(active[m].get(key, 0.0), weight)
     norm, raw = defaultdict(float), defaultdict(float)
-    for keys in active.values():
-        for key in keys:
-            norm[key] += 1.0 / len(keys)
+    for weights in active.values():
+        total = sum(weights.values())
+        for key, weight in weights.items():
+            norm[key] += weight / total
             raw[key] += 1.0
     return norm, raw, len(active)
 
@@ -273,7 +290,8 @@ def render(cfg, lo, hi, title):
     if overlap > 1:
         notes.append(
             f"_Concurrency: {q(cfg, overlap):.2f} h of the Raw column is double-counted "
-            f"parallel sessions. The Hours column splits those minutes evenly._"
+            f"parallel work. The Hours column splits those minutes by weight "
+            f"(meetings {cfg['meeting_weight']:g}x sessions)._"
         )
     unmapped = [r[0] for r in rows if r[0].startswith("unmapped: ")]
     if unmapped:
@@ -386,8 +404,8 @@ def selftest():
     cfg = dict(DEFAULT_CONFIG)
     lo = datetime(2026, 1, 1, 9, 0)
     hi = lo + timedelta(hours=4)
-    a = (lo, lo + timedelta(minutes=60), "A")
-    b = (lo + timedelta(minutes=30), lo + timedelta(minutes=90), "B")
+    a = (lo, lo + timedelta(minutes=60), "A", 1.0)
+    b = (lo + timedelta(minutes=30), lo + timedelta(minutes=90), "B", 1.0)
     norm, raw, wall = allocate([a, b], lo, hi)
     assert wall == 90, wall                      # union of 0-60 and 30-90
     assert raw["A"] == 60 and raw["B"] == 60
@@ -395,6 +413,11 @@ def selftest():
     assert abs(sum(norm.values()) - wall) < 1e-9  # normalized == wall clock
     norm, _, wall = allocate([a], lo, hi)
     assert wall == 60 and norm["A"] == 60
+    m = (lo, lo + timedelta(minutes=60), "M", 3.0)          # a meeting outweighs a session
+    norm, raw, wall = allocate([a, m], lo, hi)
+    assert wall == 60 and raw["M"] == 60
+    assert abs(norm["M"] - 45) < 1e-9 and abs(norm["A"] - 15) < 1e-9, norm   # 75 / 25
+    assert abs(sum(norm.values()) - wall) < 1e-9
     assert q(cfg, 55) == 1.0 and q(cfg, 8) == 0.25   # quarter-hour rounding
     wt = {"projects": {"-repo": {"project": "R", "charge": "C1"},
                        "-repo--claude-worktrees-x-ab12": {"project": "X", "charge": "C2"}}}
