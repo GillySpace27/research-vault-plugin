@@ -41,6 +41,12 @@ For each meaningful action taken in this session, append a `## Work log`
 bullet to `daily_notes/YYYY-MM-DD.md` (create from template if missing). See
 vault-journal skill for format.
 
+### 3.5. Refresh the day's time layer
+
+Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/timesheet.py" day --write` so the
+daily note's `## Time` section matches the work just logged. See the
+vault-time skill. Skip if the vault has no `time_tracking/` folder.
+
 ### 4. Capture, don't curate
 
 Don't reformat surrounding content. Don't reorder. Don't make it pretty. The
@@ -78,6 +84,10 @@ Gather from available MCP sources:
 - **Google Calendar** — list recent + upcoming events; flag meetings that
   mention vault projects with no associated open tasks.
 - **Slack** — search recent messages, read DMs and project channels.
+
+As each source is scanned, append any off-session work with a real timestamp
+(sent mail, Slack thread, attended meeting) to `time_tracking/events.tsv`, then
+re-run the step-3.5 timesheet write. Rules and row format: vault-time skill.
 - **Notion** — list recently touched docs.
 - **Project tracker** (Asana / Linear / Atlassian / monday / ClickUp) — pull
   tasks assigned to the user that aren't already in the vault.

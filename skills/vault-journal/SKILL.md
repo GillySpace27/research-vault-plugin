@@ -32,6 +32,9 @@ Keep these exact heading names so both Claude and the user can parse:
   project file named (e.g. `<project>.md`).
 - `## Decisions & notes` — choices made, assumptions, things learned.
 - `## Follow-ups` — open threads carried into tomorrow.
+- `## Time` — per-project hours. **Generated, never hand-written**: it is
+  written and rewritten by `scripts/timesheet.py` (vault-time skill). Weekly
+  and biweekly rollups live in `daily_notes/weekly/` and `daily_notes/periods/`.
 
 ## When to update
 

@@ -75,6 +75,7 @@ export RESEARCH_VAULT_DIR=~/path/to/vault
 | `/triage` | Inbox triage: walk `inbox.md`, decide a route, move surgically. |
 | `/capture <text>` | Drop a one-line task into the most likely project file (or `inbox.md` if ambiguous). 10-second rule. |
 | `/dashboard` | Regenerate the interactive `dashboard.html` from the vault. |
+| `/timesheet [day|week|period]` | Per-project hours from session timestamps + logged comms; writes the daily note's `## Time` layer and weekly / biweekly rollups. |
 
 ## Skills
 
@@ -89,6 +90,7 @@ conventions so future sessions don't need to be re-briefed.
 | `vault-journal` | Daily journal location, structure, when/how to update. |
 | `vault-update` | The "update the vault" multi-step reconciliation flow. |
 | `vault-status` | Six-bucket status grouping for proposals/projects. |
+| `vault-time` | Where the hours come from, what they mean, and their limits. |
 | `vault-memory` | Two-tier memory (vault `CLAUDE.md` hot cache + `memory/` deep storage). |
 
 ## Vault layout created
@@ -107,6 +109,9 @@ conventions so future sessions don't need to be re-briefed.
 ├── proposal-ideas.md          ← idea-first proposal capture
 ├── <project>.md         ← one per project
 ├── daily_notes/YYYY-MM-DD.md
+├── daily_notes/weekly/ , daily_notes/periods/   ← time rollups, via /timesheet
+├── time_tracking/config.json  ← session-dir → project + charge-code map
+├── time_tracking/events.tsv   ← off-session work (email, meetings, calls)
 ├── memory/              ← two-tier memory (hot cache lives in CLAUDE.md)
 │   ├── glossary.md
 │   ├── people/<name>.md

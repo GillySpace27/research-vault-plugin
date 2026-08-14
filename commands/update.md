@@ -20,8 +20,11 @@ Run the steps in the vault-update skill, default section:
 3. Append a `## Work log` bullet to today's `daily_notes/YYYY-MM-DD.md` for
    each meaningful action (create the daily note from
    `_templates/daily-note.md` first if missing).
-4. Surgical edits only — capture, don't curate.
-5. Report what landed where, with an "Assumed" section flagging ambiguous
+4. Refresh the day's time layer:
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/timesheet.py" day --write` (see the
+   vault-time skill). Skip if the vault has no `time_tracking/` folder.
+5. Surgical edits only — capture, don't curate.
+6. Report what landed where, with an "Assumed" section flagging ambiguous
    interpretations.
 
 If nothing recent has touched the vault, ask the user what to reconcile.
@@ -37,6 +40,10 @@ comprehensive section:
   yet in any vault `## Open` block. Group by source.
 - Suggest memory updates — new people, projects, and terms; promotion /
   demotion candidates for the hot cache.
+- Log off-session work to `time_tracking/events.tsv` — sent email, Slack
+  threads, calendar meetings tied to a vault project (see the vault-time
+  skill for the row format and the don't-double-count rules), then re-run
+  step 4 so the day's `## Time` layer includes them.
 
 Always interactive. Never auto-add tasks or memory entries.
 

@@ -1,0 +1,373 @@
+#!/usr/bin/env python3
+"""
+timesheet.py - derive per-project time from Claude Code session transcripts.
+
+Every Claude Code session writes a JSONL transcript under
+~/.claude/projects/<dir-key>/<session>.jsonl, and every line carries an ISO
+timestamp. Clustering those timestamps gives an evidence-based record of when
+work happened and (via the session's working directory) what it was on.
+
+Communications that happen outside a session (email sent, Slack thread,
+calendar meeting) are not in the transcripts, so they come from a hand/Claude
+appended ledger: time_tracking/events.tsv.
+
+What this measures: *presence* time at the keyboard, per project, split
+evenly across projects worked concurrently. It is a defensible starting draft
+for a timecard, not a certified timecard.
+
+Usage:
+    timesheet.py init                     # write a starter config from observed dirs
+    timesheet.py day    [YYYY-MM-DD] [--write]
+    timesheet.py week   [YYYY-MM-DD] [--write]
+    timesheet.py period [YYYY-MM-DD] [--write]   # biweekly, anchored in config
+    timesheet.py --selftest
+
+--write patches the vault (daily note '## Time' section, weekly/period files);
+without it, the markdown goes to stdout.
+
+Vault path: $RESEARCH_VAULT_DIR (falls back to ~/research-vault).
+"""
+
+import argparse
+import glob
+import json
+import os
+import sys
+from collections import defaultdict
+from datetime import datetime, date, time, timedelta
+
+VAULT = os.path.expanduser(os.environ.get("RESEARCH_VAULT_DIR") or "~/research-vault")
+TRANSCRIPTS = os.path.expanduser("~/.claude/projects")
+CONFIG_REL = "time_tracking/config.json"
+EVENTS_REL = "time_tracking/events.tsv"
+
+DEFAULT_CONFIG = {
+    "idle_gap_minutes": 10,
+    "min_segment_minutes": 2,
+    "default_event_minutes": 6,
+    "pay_period_anchor": "2026-01-05",
+    "round_to_hours": 0.25,
+    "projects": {},
+}
+
+# ---------------------------------------------------------------- config / io
+
+
+def cfg_path():
+    return os.path.join(VAULT, CONFIG_REL)
+
+
+def load_config():
+    cfg = dict(DEFAULT_CONFIG)
+    try:
+        with open(cfg_path()) as fh:
+            cfg.update(json.load(fh))
+    except FileNotFoundError:
+        pass
+    return cfg
+
+
+def dir_key(dirname):
+    """Collapse worktree dirs onto their parent repo: worktrees are the same project."""
+    return dirname.split("--claude-worktrees-")[0]
+
+
+def resolve(cfg, key):
+    """dir-key (or an events.tsv label) -> (project label, charge code, billable)."""
+    entry = cfg["projects"].get(key)
+    if entry is None:  # events.tsv may name the project label instead of the dir
+        for candidate in cfg["projects"].values():
+            if candidate.get("project") == key:
+                entry = candidate
+                break
+    if entry is None:
+        if key.startswith("-"):  # an unregistered session directory
+            return ("unmapped: " + key.replace("-Users-", "", 1).replace("-", "/"), "", True)
+        return (key, "", True)  # free-text label from events.tsv
+    return (entry.get("project", key), entry.get("charge", ""), entry.get("billable", True))
+
+
+# ------------------------------------------------------------------ scanning
+
+
+def parse_ts(raw):
+    return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
+
+
+def scan_transcripts(cfg, lo, hi):
+    """Return [(start, end, dir_key)] of active segments overlapping [lo, hi)."""
+    gap = timedelta(minutes=cfg["idle_gap_minutes"])
+    floor = timedelta(minutes=cfg["min_segment_minutes"])
+    out = []
+    for path in glob.glob(os.path.join(TRANSCRIPTS, "*", "*.jsonl")):
+        key = dir_key(os.path.basename(os.path.dirname(path)))
+        stamps = []
+        try:
+            with open(path, errors="replace") as fh:
+                for line in fh:
+                    # cheap prefilter: skip lines with no timestamp at all
+                    if '"timestamp"' not in line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                        stamps.append(parse_ts(rec["timestamp"]))
+                    except (ValueError, KeyError, TypeError):
+                        continue
+        except OSError:
+            continue
+        if not stamps:
+            continue
+        stamps.sort()
+        seg_start = prev = stamps[0]
+        for ts in stamps[1:] + [None]:
+            if ts is None or ts - prev > gap:
+                end = max(prev, seg_start + floor)
+                if end > lo and seg_start < hi:
+                    out.append((max(seg_start, lo), min(end, hi), key))
+                if ts is not None:
+                    seg_start = ts
+            prev = ts if ts is not None else prev
+    return out
+
+
+def load_events(cfg, lo, hi):
+    """time_tracking/events.tsv: ISO8601 <TAB> project <TAB> minutes <TAB> source <TAB> note.
+
+    'project' is a dir-key or a project label; labels are passed through as-is.
+    Blank/short lines and '#' comments are ignored.
+    """
+    path = os.path.join(VAULT, EVENTS_REL)
+    out = []
+    try:
+        fh = open(path)
+    except FileNotFoundError:
+        return out
+    with fh:
+        for lineno, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 2:
+                print(f"warn: {EVENTS_REL}:{lineno} malformed, skipped", file=sys.stderr)
+                continue
+            try:
+                start = parse_ts(parts[0])
+            except ValueError:
+                print(f"warn: {EVENTS_REL}:{lineno} bad timestamp, skipped", file=sys.stderr)
+                continue
+            mins = cfg["default_event_minutes"]
+            if len(parts) > 2 and parts[2].strip():
+                try:
+                    mins = float(parts[2])
+                except ValueError:
+                    pass
+            end = start + timedelta(minutes=mins)
+            if end > lo and start < hi:
+                out.append((max(start, lo), min(end, hi), parts[1].strip()))
+    return out
+
+
+# ---------------------------------------------------------------- allocation
+
+
+def allocate(intervals, lo, hi):
+    """Minute-resolution sweep. Returns (normalized, raw, wall_minutes).
+
+    A minute worked in two projects at once bills half to each (normalized), so
+    the per-project column always sums to real wall-clock time. 'raw' keeps the
+    unsplit per-project totals so the overlap is visible rather than silent.
+    """
+    span = int((hi - lo).total_seconds() // 60)
+    active = defaultdict(set)
+    for start, end, key in intervals:
+        a = max(0, int((start - lo).total_seconds() // 60))
+        b = min(span, int(-(-(end - lo).total_seconds() // 60)))
+        for m in range(a, b):
+            active[m].add(key)
+    norm, raw = defaultdict(float), defaultdict(float)
+    for keys in active.values():
+        for key in keys:
+            norm[key] += 1.0 / len(keys)
+            raw[key] += 1.0
+    return norm, raw, len(active)
+
+
+def q(cfg, minutes):
+    step = cfg["round_to_hours"]
+    return round(minutes / 60.0 / step) * step
+
+
+# ------------------------------------------------------------------ rendering
+
+
+def render(cfg, lo, hi, title):
+    intervals = scan_transcripts(cfg, lo, hi) + load_events(cfg, lo, hi)
+    norm, raw, wall = allocate(intervals, lo, hi)
+    if not norm:
+        return f"_No tracked activity for {title}._\n"
+
+    merged = defaultdict(lambda: [0.0, 0.0])  # several dirs can be one project
+    for key, mins in norm.items():
+        merged[resolve(cfg, key)][0] += mins
+        merged[resolve(cfg, key)][1] += raw[key]
+    rows = [(p, c, b, m, r) for (p, c, b), (m, r) in merged.items()]
+    rows.sort(key=lambda r: -r[3])
+
+    billable_total = sum(r[3] for r in rows if r[2])
+    lines = [
+        f"| Project | Charge | Hours | Raw |",
+        f"|---|---|---|---|",
+    ]
+    dust = 0.0
+    for project, charge, billable, mins, rawmins in rows:
+        if q(cfg, mins) == 0:  # rounds away; keep the table readable
+            dust += mins
+            continue
+        label = project if billable else f"{project} (non-billable)"
+        lines.append(f"| {label} | {charge} | {q(cfg, mins):.2f} | {q(cfg, rawmins):.2f} |")
+    if dust:
+        lines.append(f"| _{sum(1 for r in rows if q(cfg, r[3]) == 0)} project(s) under "
+                     f"the rounding floor_ | | 0.00 | {q(cfg, dust):.2f} |")
+    lines.append(f"| **Billable total** | | **{q(cfg, billable_total):.2f}** | |")
+    lines.append(f"| Wall clock at keyboard | | {q(cfg, wall):.2f} | |")
+
+    overlap = sum(r[4] for r in rows) - sum(r[3] for r in rows)
+    notes = [
+        "",
+        f"_{title}. Generated {datetime.now():%Y-%m-%d %H:%M} by `scripts/timesheet.py` "
+        f"from Claude Code session transcripts (idle gap {cfg['idle_gap_minutes']} min) "
+        f"and `{EVENTS_REL}`. Presence time, not a certified timecard: review before "
+        f"it goes on one._",
+    ]
+    if overlap > 1:
+        notes.append(
+            f"_Concurrency: {q(cfg, overlap):.2f} h of the Raw column is double-counted "
+            f"parallel sessions. The Hours column splits those minutes evenly._"
+        )
+    unmapped = [r[0] for r in rows if r[0].startswith("unmapped: ")]
+    if unmapped:
+        notes.append(
+            f"_{len(unmapped)} unmapped source dir(s): add them to `{CONFIG_REL}` "
+            f"to get a project name and charge code._"
+        )
+    return "\n".join(lines + notes) + "\n"
+
+
+# -------------------------------------------------------------------- writing
+
+
+def splice(path, heading, body, header=None):
+    """Replace the `heading` section of a markdown file, or append it."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path) as fh:
+            text = fh.read()
+    except FileNotFoundError:
+        text = (header or "") + "\n"
+    block = f"{heading}\n\n{body}"
+    if heading in text:
+        start = text.index(heading)
+        rest = text[start + len(heading):]
+        nxt = rest.find("\n## ")
+        tail = rest[nxt + 1:] if nxt != -1 else ""
+        text = text[:start] + block + ("\n" + tail if tail else "")
+    else:
+        text = text.rstrip("\n") + "\n\n" + block
+    with open(path, "w") as fh:
+        fh.write(text)
+    return path
+
+
+# ------------------------------------------------------------------- periods
+
+
+def period_bounds(cfg, day):
+    anchor = date.fromisoformat(cfg["pay_period_anchor"])
+    n = (day - anchor).days // 14
+    start = anchor + timedelta(days=14 * n)
+    return start, start + timedelta(days=14)
+
+
+def cmd_init():
+    cfg = load_config()
+    for path in sorted(glob.glob(os.path.join(TRANSCRIPTS, "*"))):
+        if not os.path.isdir(path):
+            continue
+        key = dir_key(os.path.basename(path))
+        guess = key.replace("-Users-", "", 1).replace("-", "/")
+        guess = guess.split("/", 1)[1] if "/" in guess else guess  # drop the username
+        cfg["projects"].setdefault(key, {"project": guess, "charge": "", "billable": True})
+    os.makedirs(os.path.dirname(cfg_path()), exist_ok=True)
+    with open(cfg_path(), "w") as fh:
+        json.dump(cfg, fh, indent=2, sort_keys=True)
+    print(f"wrote {cfg_path()} with {len(cfg['projects'])} source dirs; "
+          f"fill in project names + charge codes.")
+
+
+def selftest():
+    cfg = dict(DEFAULT_CONFIG)
+    lo = datetime(2026, 1, 1, 9, 0)
+    hi = lo + timedelta(hours=4)
+    a = (lo, lo + timedelta(minutes=60), "A")
+    b = (lo + timedelta(minutes=30), lo + timedelta(minutes=90), "B")
+    norm, raw, wall = allocate([a, b], lo, hi)
+    assert wall == 90, wall                      # union of 0-60 and 30-90
+    assert raw["A"] == 60 and raw["B"] == 60
+    assert abs(norm["A"] - 45) < 1e-9, norm      # 30 solo + 30 shared/2
+    assert abs(sum(norm.values()) - wall) < 1e-9  # normalized == wall clock
+    norm, _, wall = allocate([a], lo, hi)
+    assert wall == 60 and norm["A"] == 60
+    assert q(cfg, 55) == 1.0 and q(cfg, 8) == 0.25   # quarter-hour rounding
+    s, e = period_bounds(cfg, date(2026, 1, 6))
+    assert (s, e) == (date(2026, 1, 5), date(2026, 1, 19)), (s, e)
+    s, _ = period_bounds(cfg, date(2026, 1, 4))      # before the anchor
+    assert s == date(2025, 12, 22), s
+    print("selftest ok")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("mode", nargs="?", default="day",
+                    choices=["day", "week", "period", "init"])
+    ap.add_argument("date", nargs="?", help="anchor date, YYYY-MM-DD (default today)")
+    ap.add_argument("--write", action="store_true", help="patch the vault files")
+    ap.add_argument("--selftest", action="store_true")
+    args = ap.parse_args()
+
+    if args.selftest:
+        return selftest()
+    if args.mode == "init":
+        return cmd_init()
+
+    cfg = load_config()
+    day = date.fromisoformat(args.date) if args.date else date.today()
+
+    if args.mode == "day":
+        lo, hi = datetime.combine(day, time()), datetime.combine(day, time()) + timedelta(days=1)
+        body = render(cfg, lo, hi, f"Time for {day}")
+        target = os.path.join(VAULT, "daily_notes", f"{day}.md")
+        header = f"# {day}: Daily Note\n"
+    elif args.mode == "week":
+        start = day - timedelta(days=day.weekday())
+        lo, hi = datetime.combine(start, time()), datetime.combine(start, time()) + timedelta(days=7)
+        iso = start.isocalendar()
+        body = render(cfg, lo, hi, f"Week of {start} ({iso[0]}-W{iso[1]:02d})")
+        target = os.path.join(VAULT, "daily_notes", "weekly", f"{iso[0]}-W{iso[1]:02d}.md")
+        header = f"# {iso[0]}-W{iso[1]:02d}: Week of {start}\n"
+    else:
+        start, end = period_bounds(cfg, day)
+        lo, hi = datetime.combine(start, time()), datetime.combine(end, time())
+        body = render(cfg, lo, hi, f"Pay period {start} to {end - timedelta(days=1)}")
+        target = os.path.join(VAULT, "daily_notes", "periods", f"{start}_to_{end - timedelta(days=1)}.md")
+        header = f"# Pay period {start} to {end - timedelta(days=1)}\n"
+
+    if args.write:
+        print("wrote " + splice(target, "## Time", body, header))
+    else:
+        print(body)
+
+
+if __name__ == "__main__":
+    main()
