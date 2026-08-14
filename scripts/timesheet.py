@@ -49,6 +49,7 @@ DEFAULT_CONFIG = {
     "pay_period": "semi-monthly",
     "pay_period_anchor": "2026-01-05",
     "round_to_hours": 0.25,
+    "target_hours_per_week": 0,
     "projects": {},
 }
 
@@ -195,6 +196,22 @@ def allocate(intervals, lo, hi):
     return norm, raw, len(active)
 
 
+def target_hours(cfg, lo, hi):
+    """Expected billable hours over [lo, hi): weekdays only, elapsed days only.
+
+    A part-time appointment (soft money, a funding shortfall, a partial FTE) is
+    the difference between "I am behind" and "that is the deal", so the target
+    is stated rather than left for the reader to hold in their head.
+    """
+    per_week = cfg.get("target_hours_per_week")
+    if not per_week:
+        return 0.0
+    today = date.today()
+    days = [lo.date() + timedelta(days=n) for n in range((hi - lo).days)]
+    workdays = [d for d in days if d.weekday() < 5 and d <= today]
+    return len(workdays) * per_week / 5.0
+
+
 def q(cfg, minutes):
     step = cfg["round_to_hours"]
     return round(minutes / 60.0 / step) * step
@@ -233,6 +250,10 @@ def render(cfg, lo, hi, title):
                      f"the rounding floor_ | | 0.00 | {q(cfg, dust):.2f} |")
     lines.append(f"| **Billable total** | | **{q(cfg, billable_total):.2f}** | |")
     lines.append(f"| Wall clock at keyboard | | {q(cfg, wall):.2f} | |")
+    target = target_hours(cfg, lo, hi)
+    if target:
+        lines.append(f"| Target ({cfg['target_hours_per_week']} h/wk) | | "
+                     f"{target:.2f} | {billable_total / 60.0 / target:.0%} met |")
 
     overlap = sum(r[4] for r in rows) - sum(r[3] for r in rows)
     notes = [
@@ -372,6 +393,10 @@ def selftest():
     assert period_bounds(cfg, date(2026, 1, 16)) == (date(2026, 1, 16), date(2026, 2, 1))
     assert period_bounds(cfg, date(2026, 2, 28)) == (date(2026, 2, 16), date(2026, 3, 1))
     assert period_bounds(cfg, date(2026, 12, 31)) == (date(2026, 12, 16), date(2027, 1, 1))
+    past = dict(cfg, target_hours_per_week=20)   # a fully elapsed week: Mon-Fri
+    assert target_hours(past, datetime(2026, 1, 5), datetime(2026, 1, 12)) == 20.0
+    assert target_hours(past, datetime(2026, 1, 10), datetime(2026, 1, 12)) == 0.0  # weekend
+    assert target_hours(cfg, datetime(2026, 1, 5), datetime(2026, 1, 12)) == 0.0    # unset
     bi = dict(cfg, pay_period="biweekly")
     assert period_bounds(bi, date(2026, 1, 6)) == (date(2026, 1, 5), date(2026, 1, 19))
     assert period_bounds(bi, date(2026, 1, 4))[0] == date(2025, 12, 22)  # before anchor

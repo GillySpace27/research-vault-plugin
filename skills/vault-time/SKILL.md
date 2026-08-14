@@ -108,6 +108,18 @@ NWRA charge code, and a `billable` flag. New directories show up as
 work stays in the table with `"billable": false` so the day still reconciles to
 24 hours without inflating the billable total.
 
+## Part-time appointments
+
+If `target_hours_per_week` is set in the config, the summary table carries a
+`Target` row: expected billable hours over the *elapsed weekdays* of the range,
+and the percentage met. A part-time appointment (soft money, a funding
+shortfall, a partial FTE) makes "20 h" either on-plan or badly behind, and the
+script should not leave the reader to hold that number in their head. Set it to
+0 to hide the row.
+
+Hours below target usually mean work that never reached a session or
+`events.tsv`, not idleness. Say that rather than implying underwork.
+
 ## Reporting style
 
 Terse. A table and one line of caveat. Flag anything the user must decide:
