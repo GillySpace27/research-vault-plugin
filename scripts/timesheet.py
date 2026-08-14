@@ -19,7 +19,7 @@ Usage:
     timesheet.py init                     # write a starter config from observed dirs
     timesheet.py day    [YYYY-MM-DD] [--write]
     timesheet.py week   [YYYY-MM-DD] [--write]
-    timesheet.py period [YYYY-MM-DD] [--write]   # biweekly, anchored in config
+    timesheet.py period [YYYY-MM-DD] [--write]   # pay period (see config)
     timesheet.py --selftest
 
 --write patches the vault (daily note '## Time' section, weekly/period files);
@@ -45,6 +45,7 @@ DEFAULT_CONFIG = {
     "idle_gap_minutes": 10,
     "min_segment_minutes": 2,
     "default_event_minutes": 6,
+    "pay_period": "semi-monthly",
     "pay_period_anchor": "2026-01-05",
     "round_to_hours": 0.25,
     "projects": {},
@@ -283,10 +284,16 @@ def splice(path, heading, body, header=None):
 
 
 def period_bounds(cfg, day):
-    anchor = date.fromisoformat(cfg["pay_period_anchor"])
-    n = (day - anchor).days // 14
-    start = anchor + timedelta(days=14 * n)
-    return start, start + timedelta(days=14)
+    """[start, end) of the pay period containing `day`. End is exclusive."""
+    if cfg.get("pay_period", "semi-monthly") == "biweekly":
+        anchor = date.fromisoformat(cfg["pay_period_anchor"])
+        start = anchor + timedelta(days=14 * ((day - anchor).days // 14))
+        return start, start + timedelta(days=14)
+    # semi-monthly: the 1st-15th and the 16th-end of month
+    if day.day <= 15:
+        return day.replace(day=1), day.replace(day=16)
+    nxt = (day.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return day.replace(day=16), nxt
 
 
 def cmd_init():
@@ -319,10 +326,13 @@ def selftest():
     norm, _, wall = allocate([a], lo, hi)
     assert wall == 60 and norm["A"] == 60
     assert q(cfg, 55) == 1.0 and q(cfg, 8) == 0.25   # quarter-hour rounding
-    s, e = period_bounds(cfg, date(2026, 1, 6))
-    assert (s, e) == (date(2026, 1, 5), date(2026, 1, 19)), (s, e)
-    s, _ = period_bounds(cfg, date(2026, 1, 4))      # before the anchor
-    assert s == date(2025, 12, 22), s
+    assert period_bounds(cfg, date(2026, 1, 6)) == (date(2026, 1, 1), date(2026, 1, 16))
+    assert period_bounds(cfg, date(2026, 1, 16)) == (date(2026, 1, 16), date(2026, 2, 1))
+    assert period_bounds(cfg, date(2026, 2, 28)) == (date(2026, 2, 16), date(2026, 3, 1))
+    assert period_bounds(cfg, date(2026, 12, 31)) == (date(2026, 12, 16), date(2027, 1, 1))
+    bi = dict(cfg, pay_period="biweekly")
+    assert period_bounds(bi, date(2026, 1, 6)) == (date(2026, 1, 5), date(2026, 1, 19))
+    assert period_bounds(bi, date(2026, 1, 4))[0] == date(2025, 12, 22)  # before anchor
     print("selftest ok")
 
 

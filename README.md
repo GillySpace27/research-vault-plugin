@@ -75,7 +75,7 @@ export RESEARCH_VAULT_DIR=~/path/to/vault
 | `/triage` | Inbox triage: walk `inbox.md`, decide a route, move surgically. |
 | `/capture <text>` | Drop a one-line task into the most likely project file (or `inbox.md` if ambiguous). 10-second rule. |
 | `/dashboard` | Regenerate the interactive `dashboard.html` from the vault. |
-| `/timesheet [day|week|period]` | Per-project hours from session timestamps + logged comms; writes the daily note's `## Time` layer and weekly / biweekly rollups. |
+| `/timesheet [day|week|period]` | Per-project hours from session timestamps + logged comms; writes the daily note's `## Time` layer and weekly / pay-period rollups. |
 
 ## Skills
 

@@ -1,5 +1,5 @@
 ---
-description: Per-project hours derived from Claude Code session timestamps plus logged communications. Writes a `## Time` layer into the daily note, and weekly / biweekly pay-period rollups.
+description: Per-project hours derived from Claude Code session timestamps plus logged communications. Writes a `## Time` layer into the daily note, and weekly / pay-period rollups.
 argument-hint: "[day|week|period] [YYYY-MM-DD] [--write]"
 ---
 
@@ -12,8 +12,8 @@ and their limits.
 
 ### 1. Resolve arguments
 
-- Scope: `day` (default), `week`, or `period` (biweekly, anchored in
-  `time_tracking/config.json`).
+- Scope: `day` (default), `week`, or `period` (pay period; `semi-monthly` or
+  `biweekly` per `time_tracking/config.json`).
 - Date: default today; resolve any relative reference ("Monday", "last week")
   to absolute `YYYY-MM-DD` first.
 - `--write` patches vault files; without it, report to the user only.
@@ -42,8 +42,9 @@ Show the table as returned, then at most three lines:
 
 ### 4. Offer the rollup
 
-If the date is a Friday or the last day of a pay period and the corresponding
-rollup file doesn't exist yet, offer to run `week --write` / `period --write`.
+If the date is a Friday, offer `week --write`. Timecards are typically due
+before the period closes, so from a few days before the end of a pay period
+onward, offer `period --write` too (re-running later refreshes it in place).
 
 ## Notes
 

@@ -1,6 +1,6 @@
 ---
 name: vault-time
-description: Time tracking for the research vault - derives per-project hours from Claude Code session transcripts plus a logged-communications ledger, and writes a `## Time` layer into the daily note, a weekly rollup, and a biweekly pay-period rollup. Use whenever the user asks how long something took, how much time went to a project, what to put on a timecard, or as part of the "update the vault" convention.
+description: Time tracking for the research vault - derives per-project hours from Claude Code session transcripts plus a logged-communications ledger, and writes a `## Time` layer into the daily note, a weekly rollup, and a pay-period rollup. Use whenever the user asks how long something took, how much time went to a project, what to put on a timecard, or as part of the "update the vault" convention.
 ---
 
 # Vault time tracking
@@ -41,7 +41,7 @@ on an NWRA timecard is Gilly's call, not the script's.
 export RESEARCH_VAULT_DIR=~/path/to/vault          # already set in settings.json
 python3 scripts/timesheet.py day    [YYYY-MM-DD] [--write]
 python3 scripts/timesheet.py week   [YYYY-MM-DD] [--write]   # ISO week of that date
-python3 scripts/timesheet.py period [YYYY-MM-DD] [--write]   # biweekly pay period
+python3 scripts/timesheet.py period [YYYY-MM-DD] [--write]   # pay period
 python3 scripts/timesheet.py init                            # register new source dirs
 python3 scripts/timesheet.py --selftest
 ```
@@ -51,7 +51,7 @@ With `--write` it replaces the `## Time` section of:
 
 - `daily_notes/YYYY-MM-DD.md`
 - `daily_notes/weekly/YYYY-Www.md`
-- `daily_notes/periods/YYYY-MM-DD_to_YYYY-MM-DD.md`
+- `daily_notes/periods/YYYY-MM-DD_to_YYYY-MM-DD.md` (one pay period)
 
 The section is regenerated in place, so re-running is always safe and never
 duplicates. Everything else in those files is left untouched.
@@ -62,9 +62,15 @@ duplicates. Everything else in those files is left untouched.
   `day --write` after the daily-note bullets land, so the `## Time` layer and
   the `## Work log` agree.
 - **Friday (or on the last day worked in an ISO week)**: `week --write`.
-- **Last day of a pay period**: `period --write`.
+- **Before the timecard is due**, which is usually *before* the period ends:
+  run `period --write` when filling the card in, then again on the last day of
+  the period so the vault's record matches what was actually worked. The file
+  is regenerated in place, so running it early costs nothing.
 - **Any time the user asks** "how long did X take", "how much time on PUNCH
   this week", "what do I put on my timecard": run it and quote it.
+
+`pay_period` in the config is `semi-monthly` (the 1st-15th and the 16th-end of
+month) or `biweekly` (every 14 days from `pay_period_anchor`).
 
 ## Logging communications
 
