@@ -127,6 +127,12 @@ script should not leave the reader to hold that number in their head. Set it to
 Hours below target usually mean work that never reached a session or
 `events.tsv`, not idleness. Say that rather than implying underwork.
 
+Paid time off is not project work but does count toward the target and does go
+on the card. Log it as `events.tsv` rows under `leave_label` ("Personal Leave"),
+and the summary splits into **Charged to projects**, **Personal Leave**, and
+**Card total**. The target percentage measures the card total, since that is
+what the appointment is denominated in.
+
 ## Reporting style
 
 Terse. A table and one line of caveat. Flag anything the user must decide:

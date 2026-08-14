@@ -52,6 +52,7 @@ DEFAULT_CONFIG = {
     "pay_period_anchor": "2026-01-05",
     "round_to_hours": 0.25,
     "target_hours_per_week": 0,
+    "leave_label": "Personal Leave",
     "projects": {},
 }
 
@@ -257,13 +258,16 @@ def render(cfg, lo, hi, title):
     rows = [(p, c, b, m, r) for (p, c, b), (m, r) in merged.items()]
     rows.sort(key=lambda r: -r[3])
 
-    billable_total = sum(r[3] for r in rows if r[2])
+    leave_total = sum(r[3] for r in rows if r[0] == cfg["leave_label"])
+    billable_total = sum(r[3] for r in rows if r[2] and r[0] != cfg["leave_label"])
     lines = [
         f"| Project | Charge | Hours | Raw |",
         f"|---|---|---|---|",
     ]
     dust = 0.0
     for project, charge, billable, mins, rawmins in rows:
+        if project == cfg["leave_label"]:  # paid, but not charged to a project
+            continue
         if q(cfg, mins) == 0:  # rounds away; keep the table readable
             dust += mins
             continue
@@ -272,12 +276,17 @@ def render(cfg, lo, hi, title):
     if dust:
         lines.append(f"| _{sum(1 for r in rows if q(cfg, r[3]) == 0)} project(s) under "
                      f"the rounding floor_ | | 0.00 | {q(cfg, dust):.2f} |")
-    lines.append(f"| **Billable total** | | **{q(cfg, billable_total):.2f}** | |")
+    lines.append(f"| **Charged to projects** | | **{q(cfg, billable_total):.2f}** | |")
+    if leave_total:
+        lines.append(f"| {cfg['leave_label']} | | {q(cfg, leave_total):.2f} | |")
+        lines.append(f"| **Card total** | | **{q(cfg, billable_total + leave_total):.2f}** | |")
     lines.append(f"| Wall clock at keyboard | | {q(cfg, wall):.2f} | |")
     target = target_hours(cfg, lo, hi)
     if target:
+        # the target is paid hours, so leave counts toward it
+        paid = (billable_total + leave_total) / 60.0
         lines.append(f"| Target ({cfg['target_hours_per_week']} h/wk) | | "
-                     f"{target:.2f} | {billable_total / 60.0 / target:.0%} met |")
+                     f"{target:.2f} | {paid / target:.0%} met |")
 
     overlap = sum(r[4] for r in rows) - sum(r[3] for r in rows)
     notes = [
