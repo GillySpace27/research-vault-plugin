@@ -76,8 +76,14 @@ def dir_key(dirname):
 
 
 def resolve(cfg, key):
-    """dir-key (or an events.tsv label) -> (project label, charge code, billable)."""
-    entry = cfg["projects"].get(key)
+    """dir-key (or an events.tsv label) -> (project label, charge code, billable).
+
+    A worktree name usually says what the work was ("...--claude-worktrees-dkist-
+    backup-recovery-83d46a"), so an exact worktree entry in the config wins over
+    the collapsed repo entry. That is the only way to split one repo's sessions
+    across charge codes.
+    """
+    entry = cfg["projects"].get(key) or cfg["projects"].get(dir_key(key))
     if entry is None:  # events.tsv may name the project label instead of the dir
         for candidate in cfg["projects"].values():
             if candidate.get("project") == key:
@@ -85,7 +91,8 @@ def resolve(cfg, key):
                 break
     if entry is None:
         if key.startswith("-"):  # an unregistered session directory
-            return ("unmapped: " + key.replace("-Users-", "", 1).replace("-", "/"), "", True)
+            collapsed = dir_key(key)
+            return ("unmapped: " + collapsed.replace("-Users-", "", 1).replace("-", "/"), "", True)
         return (key, "", True)  # free-text label from events.tsv
     return (entry.get("project", key), entry.get("charge", ""), entry.get("billable", True))
 
@@ -103,7 +110,7 @@ def scan_transcripts(cfg, lo, hi):
     floor = timedelta(minutes=cfg["min_segment_minutes"])
     out = []
     for path in glob.glob(os.path.join(TRANSCRIPTS, "*", "*.jsonl")):
-        key = dir_key(os.path.basename(os.path.dirname(path)))
+        key = os.path.basename(os.path.dirname(path))
         stamps = []
         try:
             with open(path, errors="replace") as fh:
@@ -389,6 +396,10 @@ def selftest():
     norm, _, wall = allocate([a], lo, hi)
     assert wall == 60 and norm["A"] == 60
     assert q(cfg, 55) == 1.0 and q(cfg, 8) == 0.25   # quarter-hour rounding
+    wt = {"projects": {"-repo": {"project": "R", "charge": "C1"},
+                       "-repo--claude-worktrees-x-ab12": {"project": "X", "charge": "C2"}}}
+    assert resolve(wt, "-repo--claude-worktrees-x-ab12")[0] == "X"   # worktree entry wins
+    assert resolve(wt, "-repo--claude-worktrees-y-cd34")[0] == "R"   # falls back to the repo
     assert period_bounds(cfg, date(2026, 1, 6)) == (date(2026, 1, 1), date(2026, 1, 16))
     assert period_bounds(cfg, date(2026, 1, 16)) == (date(2026, 1, 16), date(2026, 2, 1))
     assert period_bounds(cfg, date(2026, 2, 28)) == (date(2026, 2, 16), date(2026, 3, 1))
