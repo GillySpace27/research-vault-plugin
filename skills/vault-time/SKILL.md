@@ -42,6 +42,7 @@ export RESEARCH_VAULT_DIR=~/path/to/vault          # already set in settings.jso
 python3 scripts/timesheet.py day    [YYYY-MM-DD] [--write]
 python3 scripts/timesheet.py week   [YYYY-MM-DD] [--write]   # ISO week of that date
 python3 scripts/timesheet.py period [YYYY-MM-DD] [--write]   # pay period
+python3 scripts/timesheet.py period --by-day                  # project x day matrix
 python3 scripts/timesheet.py init                            # register new source dirs
 python3 scripts/timesheet.py --selftest
 ```
@@ -52,6 +53,12 @@ With `--write` it replaces the `## Time` section of:
 - `daily_notes/YYYY-MM-DD.md`
 - `daily_notes/weekly/YYYY-Www.md`
 - `daily_notes/periods/YYYY-MM-DD_to_YYYY-MM-DD.md` (one pay period)
+
+Written week and period rollups carry both shapes: the project totals, then a
+project x day matrix (the shape a timecard wants). `--by-day` picks the matrix
+for stdout. Per-day cells round independently, so the day columns can sum a
+quarter-hour off the period total; both are correct, the period total is the
+one to file.
 
 The section is regenerated in place, so re-running is always safe and never
 duplicates. Everything else in those files is left untouched.

@@ -17,6 +17,8 @@ and their limits.
 - Date: default today; resolve any relative reference ("Monday", "last week")
   to absolute `YYYY-MM-DD` first.
 - `--write` patches vault files; without it, report to the user only.
+- `--by-day` (week/period only) prints the project x day matrix instead of
+  project totals. A `--write` rollup always contains both.
 - Bare `/timesheet` with no arguments: `day`, today, no write.
 
 ### 2. Run it

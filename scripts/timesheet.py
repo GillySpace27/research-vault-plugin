@@ -20,6 +20,7 @@ Usage:
     timesheet.py day    [YYYY-MM-DD] [--write]
     timesheet.py week   [YYYY-MM-DD] [--write]
     timesheet.py period [YYYY-MM-DD] [--write]   # pay period (see config)
+    timesheet.py period --by-day                 # project x day matrix
     timesheet.py --selftest
 
 --write patches the vault (daily note '## Time' section, weekly/period files);
@@ -255,6 +256,47 @@ def render(cfg, lo, hi, title):
     return "\n".join(lines + notes) + "\n"
 
 
+def render_by_day(cfg, lo, hi, title):
+    """Project x day matrix: the shape a timecard actually wants."""
+    days = [lo + timedelta(days=n) for n in range((hi - lo).days)]
+    per_day, totals = {}, defaultdict(float)
+    for start in days:
+        norm, _, _ = allocate(
+            scan_transcripts(cfg, start, start + timedelta(days=1))
+            + load_events(cfg, start, start + timedelta(days=1)),
+            start, start + timedelta(days=1))
+        merged = defaultdict(float)
+        for key, mins in norm.items():
+            merged[resolve(cfg, key)] += mins
+        per_day[start.date()] = merged
+        for who, mins in merged.items():
+            totals[who] += mins
+    if not totals:
+        return f"_No tracked activity for {title}._\n"
+
+    order = sorted(totals, key=lambda w: -totals[w])
+    head = " | ".join(f"{d.day:02d}" for d in days)
+    lines = [f"| Project | Charge | {head} | Total |",
+             "|---|---|" + "---|" * (len(days) + 1)]
+    for who in order:
+        if q(cfg, totals[who]) == 0:
+            continue
+        project, charge, billable = who
+        label = project if billable else f"{project} (nb)"
+        cells = " | ".join(
+            f"{q(cfg, per_day[d.date()].get(who, 0)):.2f}".replace("0.00", "-")
+            for d in days)
+        lines.append(f"| {label} | {charge} | {cells} | {q(cfg, totals[who]):.2f} |")
+    daily_billable = [sum(m for w, m in per_day[d.date()].items() if w[2]) for d in days]
+    cells = " | ".join(f"{q(cfg, m):.2f}".replace("0.00", "-") for m in daily_billable)
+    lines.append(f"| **Billable/day** | | {cells} | **{q(cfg, sum(daily_billable)):.2f}** |")
+    return "\n".join(lines) + (
+        f"\n\n_{title}, by day. Columns are days of the month; `-` is under the "
+        f"0.25 h rounding floor. `(nb)` = non-billable. Generated "
+        f"{datetime.now():%Y-%m-%d %H:%M} by `scripts/timesheet.py`. Presence time, "
+        f"not a certified timecard._\n")
+
+
 # -------------------------------------------------------------------- writing
 
 
@@ -343,6 +385,8 @@ def main():
                     choices=["day", "week", "period", "init"])
     ap.add_argument("date", nargs="?", help="anchor date, YYYY-MM-DD (default today)")
     ap.add_argument("--write", action="store_true", help="patch the vault files")
+    ap.add_argument("--by-day", action="store_true",
+                    help="project x day matrix instead of one total (week/period)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -363,13 +407,21 @@ def main():
         start = day - timedelta(days=day.weekday())
         lo, hi = datetime.combine(start, time()), datetime.combine(start, time()) + timedelta(days=7)
         iso = start.isocalendar()
-        body = render(cfg, lo, hi, f"Week of {start} ({iso[0]}-W{iso[1]:02d})")
+        label = f"Week of {start} ({iso[0]}-W{iso[1]:02d})"
+        body = (render_by_day(cfg, lo, hi, label) if args.by_day
+                else render(cfg, lo, hi, label))
+        if args.write:  # the written rollup carries both shapes
+            body = render(cfg, lo, hi, label) + "\n" + render_by_day(cfg, lo, hi, label)
         target = os.path.join(VAULT, "daily_notes", "weekly", f"{iso[0]}-W{iso[1]:02d}.md")
         header = f"# {iso[0]}-W{iso[1]:02d}: Week of {start}\n"
     else:
         start, end = period_bounds(cfg, day)
         lo, hi = datetime.combine(start, time()), datetime.combine(end, time())
-        body = render(cfg, lo, hi, f"Pay period {start} to {end - timedelta(days=1)}")
+        label = f"Pay period {start} to {end - timedelta(days=1)}"
+        body = (render_by_day(cfg, lo, hi, label) if args.by_day
+                else render(cfg, lo, hi, label))
+        if args.write:
+            body = render(cfg, lo, hi, label) + "\n" + render_by_day(cfg, lo, hi, label)
         target = os.path.join(VAULT, "daily_notes", "periods", f"{start}_to_{end - timedelta(days=1)}.md")
         header = f"# Pay period {start} to {end - timedelta(days=1)}\n"
 
