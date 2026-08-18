@@ -46,7 +46,9 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
    together. I'll coin #firstname-lastname handles.
 3. Your active projects — a short name + one line each. I'll make one file per
    project. Flag any that are grant proposals and their stage (idea / drafting /
-   submitted / awarded) so I can also seed your proposal trackers.
+   submitted / awarded) so I can also seed your proposal trackers, and flag any
+   that are papers/manuscripts and their stage (idea / drafting / under review /
+   accepted / published) so I can seed your papers tracker.
 4. Any codenames or acronyms you use that I should know? (e.g. "the storefront"
    = a specific app)
 ```
@@ -66,7 +68,7 @@ Let's seed your vault. I'll ask a few quick things — say "skip" to any.
 - **Starter files copied verbatim** from `${CLAUDE_PLUGIN_ROOT}/_templates/`
   into the vault root (these ship as real templates — copy, don't improvise):
   `inbox.md`, `personal.md`, `dashboard.md`, `journaling.md`,
-  `proposal-solicitations.md`, `proposal-ideas.md`, and `vault-README.md`
+  `proposal-solicitations.md`, `proposal-ideas.md`, `papers.md`, and `vault-README.md`
   (write it to the vault as `README.md`). If the user flagged any project as a
   proposal in Q3, add an entry for it to `proposal-solicitations.md` (with its
   `Status:` stage) or `proposal-ideas.md` (if idea-first), so the first
@@ -89,6 +91,7 @@ Check for the following — list what's present and what's missing:
 | `CLAUDE.md` | Vault-level hot-cache memory + plugin pointer |
 | `README.md` | Human-readable vault overview |
 | `projects.md` | Project manifest |
+| `papers.md` | Papers/manuscripts tracker (six-bucket, mirrors proposals) |
 | `journaling.md` | Daily journal guidelines |
 | `dashboard.md` | Obsidian Tasks queries |
 | `dashboard.html` | Interactive board view (optional) |

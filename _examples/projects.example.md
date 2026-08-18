@@ -14,6 +14,8 @@ writes your real manifest from your interview answers.
   funding calls being tracked.
 - **Proposal Ideas** (`proposal-ideas.md`) — idea-first capture before matched
   to a solicitation.
+- **Papers** (`papers.md`) — master list of papers/manuscripts in progress,
+  same six-bucket shape as the proposal trackers.
 - **Travel** (`travel.md`) — conference plans.
 - **Personal** (`personal.md`) — non-work.
 - **Inbox** (`inbox.md`) — capture catch-all.

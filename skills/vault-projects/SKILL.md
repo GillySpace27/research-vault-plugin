@@ -48,6 +48,11 @@ Process for a new file:
    summary.`).
 4. If it's a proposal, also add it to `proposal-solicitations.md` (if matched
    to a call) or `proposal-ideas.md` (if idea-first).
+5. If it's a paper, also add it to `papers.md` with a `**Status:**` line the
+   vault-status skill can bucket, the author position (it changes whose clock
+   the paper runs on), and the venue if known. A project can carry both a
+   proposal entry and a paper entry; track them separately, they do not share
+   a status.
 
 ## Project codenames
 
