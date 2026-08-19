@@ -60,6 +60,38 @@ Then do exactly one of:
 Never edit a value in place without showing the old value, the new value, and
 both sources.
 
+## Section 0 is the point of the file
+
+Every instrument file opens with a **Start here** section: the portals and the
+canonical documents, tiered. Nobody should ever have to find these from scratch
+twice. Fill it first, before any physical parameter, because a file with only
+§0 is already useful and a file with parameters but no §0 strands the next
+reader.
+
+- **Portals**: official instrument site (the team's own page, not a mission
+  overview), mission site, primary archive, search interface, quick-look,
+  data-product docs, analysis software, event catalog, local cache path.
+- **Tier 1**: team documents. Handbooks, user guides, calibration memos.
+- **Tier 2**: refereed instrument papers, with DOIs. Name which one is *the*
+  paper to cite; there is usually one instrument paper and several calibration
+  papers, and citing a calibration paper as the instrument paper is a common
+  error.
+- **Tier 3**: mission and archive documentation, and dataset DOIs.
+
+**Verify DOIs by resolving them, never by recall.** Content negotiation returns
+the full citation and proves existence in one step:
+
+```bash
+curl -sL -H "Accept: text/x-bibliography; style=apa" "https://doi.org/<DOI>"
+```
+
+For preprints, the arXiv API's `doi` and `journal_ref` fields settle whether a
+paper has been refereed yet, and give the real author order. Search engines
+routinely surface an older design paper above the actual instrument paper, and
+first authors get misremembered.
+
+Record the publication year the journal gives, not the one everybody says.
+
 ## Provenance rules
 
 These are the reason the directory is worth maintaining.

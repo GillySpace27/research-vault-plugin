@@ -8,6 +8,11 @@ kind: <coronagraph | EUV imager | magnetograph | spectrometer | in-situ field | 
 measures: [<physical quantities, e.g. white-light Thomson-scattered brightness>]
 status: <operational | extended | degraded | retired | pre-launch>
 operational: <YYYY-MM to YYYY-MM or "present">
+homepage: <official instrument or team site>
+archive: <primary data portal>
+instrument_paper: <first-author YEAR, journal vol, page>
+instrument_doi: <https://doi.org/...>
+bibtex_key: <key in the project .bib, if one exists>
 last_verified: <YYYY-MM-DD>
 ---
 
@@ -20,6 +25,54 @@ Sections that do not apply to this instrument kind are deleted outright, not
 left empty. An in-situ magnetometer has no field of view; a coronagraph has no
 energy channels. Deleting is correct; a heading with "N/A" under it is noise.
 
+## 0. Start here
+
+The point of this section is that nobody should ever have to find these
+documents from scratch again. Every entry is a live link that was checked on
+the date in [§11](#11-sources). A link that has rotted is fixed, not deleted;
+if the document has genuinely moved, record the new home and note the old one.
+
+### Portals
+
+| Resource | Link | Notes |
+|---|---|---|
+| Official instrument site | | team's own page, not a mission overview |
+| Mission site | | |
+| Primary data archive | | where the science files actually live |
+| Search / query interface | | VSO, JSOC, SDAC, Fido, web form |
+| Quick-look / browse | | daily images, movies, latest frame |
+| Data-product documentation | | product definitions, level definitions |
+| Analysis software | | official reduction package + any port |
+| Event catalog | | if the team or community maintains one |
+| Local cache | | path in this vault or an associated repo |
+
+### Tier 1 — instrument team documents
+
+Handbooks, user guides, calibration memos, interface control documents,
+release notes. These outrank everything else for design facts.
+
+| Document | Locator | Link |
+|---|---|---|
+| | chapter / table / section | |
+
+### Tier 2 — refereed instrument papers
+
+The paper to cite, plus the calibration and performance papers that carry the
+numbers. Give the DOI, and the BibTeX key if the project has one.
+
+| Citation | Covers | DOI |
+|---|---|---|
+| | | |
+
+### Tier 3 — mission and archive documentation
+
+Data-product guides, archive layout descriptions, level definitions, file
+naming conventions, release notes from the archive rather than the team.
+
+| Document | Covers | Link |
+|---|---|---|
+| | | |
+
 ## 1. Identity and heritage
 
 | Fact | Value | Source |
@@ -28,14 +81,13 @@ energy channels. Deleting is correct; a heading with "N/A" under it is noise.
 | Platform | | |
 | Launch / first light | | |
 | Principal investigator institution | | |
-| Instrument paper (cite this one) | | |
 
 ## 2. What it measures
 
 The observable, stated precisely enough that someone could tell whether two
 instruments measure the same thing. Name the physical quantity, the units it is
-distributed in, and any normalization (e.g. mean solar brightness, DN,
-physical flux). Say what it does *not* measure that a reader might assume.
+distributed in, and any normalization. Say what it does *not* measure that a
+reader might assume.
 
 | Quantity | Native unit | Distributed unit | Source |
 |---|---|---|---|
@@ -104,13 +156,18 @@ the FITS standard.
 The failure modes that cost real time. Each one gets a sentence on the symptom
 and a sentence on the fix. This section earns the file its keep.
 
-## 10. Access
+## 10. Citing and acknowledging
 
-| Route | Endpoint | Notes |
+What the team asks for, which is not always what is obvious. Record the exact
+acknowledgement string if one is prescribed, the data-use or rules-of-the-road
+policy, and whether co-authorship or advance notice is expected for particular
+data products.
+
+| Item | Value | Source |
 |---|---|---|
-| Primary archive | | |
-| Search tool | | |
-| Local cache in this vault | | |
+| Cite this paper | | |
+| Required acknowledgement | | |
+| Data-use policy | | |
 
 ## 11. Sources
 
@@ -127,8 +184,9 @@ directly off the data), **[Derived]**, **[Model-dependent]**, **[Hypothesis]**,
 table, page, or figure number>.
 - Page: <https://...>
 - Exact item: <https://...>
-- Retrieved <YYYY-MM-DD>. Type: **[Observed]**. Tier: <see skill: 1 handbook /
-  2 instrument paper / 3 mission doc / 4 data headers / 5 secondary / 6 web>.
+- Retrieved <YYYY-MM-DD>. Type: **[Observed]**. Tier: <1 team document /
+  2 instrument paper / 3 mission or archive doc / 4 data headers /
+  5 secondary literature / 6 web summary>.
 
 #### S2
 ...

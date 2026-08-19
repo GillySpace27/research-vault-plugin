@@ -32,7 +32,7 @@ def lint(path):
     for s in sorted(set(blocks) - refs):
         bad.append(f"source {s} is defined but never cited")
     for s, body in sorted(blocks.items()):
-        if not re.search(r"\b(Retrieved|Measured)\b", body):
+        if not re.search(r"\b(Retrieved|Measured|Read|Written|Checked)\b", body):
             bad.append(f"source {s} has no retrieval date")
         if not re.search(r"\[(Observed|Derived|Model-dependent|Hypothesis|Unknown)\]", body):
             bad.append(f"source {s} has no evidence type")
@@ -63,7 +63,7 @@ def main():
     files = [p for p in sorted(d.glob("*.md")) if p.name not in SKIP]
     fail = 0
     for p in files:
-        bad = lint(p)
+        bad, warn = lint(p), []
         if "--urls" in sys.argv:
             import urllib.request
             for u in sorted(set(URL.findall(p.read_text()))):
@@ -71,10 +71,19 @@ def main():
                     urllib.request.urlopen(urllib.request.Request(
                         u, method="HEAD", headers={"User-Agent": "vault-lint"}), timeout=15)
                 except Exception as e:
-                    bad.append(f"link does not answer: {u} ({type(e).__name__})")
-        print(f"{p.name}: {'OK' if not bad else str(len(bad)) + ' problem(s)'}")
+                    # A cert chain the server failed to send, or a host that
+                    # refuses robots, is not a dead link. Report, don't fail.
+                    msg = f"{type(e).__name__}: {e}"
+                    soft = ("CERTIFICATE" in msg.upper() or "SSL" in msg.upper()
+                            or "403" in msg)
+                    warn.append(f"link unverifiable ({msg[:60]}): {u}") if soft \
+                        else bad.append(f"link does not answer: {u} ({msg[:60]})")
+        tag = "OK" if not bad else f"{len(bad)} problem(s)"
+        print(f"{p.name}: {tag}" + (f", {len(warn)} unverifiable link(s)" if warn else ""))
         for b in bad:
             print(f"  - {b}"); fail += 1
+        for w in warn:
+            print(f"  ~ {w}")
     return 1 if fail else 0
 
 

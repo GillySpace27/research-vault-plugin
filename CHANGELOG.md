@@ -8,6 +8,13 @@ engine change to keep forks traceable. Format follows
 ## [Unreleased]
 
 ### Added
+- **Instrument files open with a `§0 Start here` document registry**: portals
+  (official site, mission site, archive, search, quick-look, software, event
+  catalog, local cache) plus tier 1/2/3 documents with DOIs, so the sources
+  never have to be re-found. Adds a `§10 Citing and acknowledging` section and
+  `homepage`/`archive`/`instrument_doi`/`bibtex_key` frontmatter. The skill now
+  requires DOIs to be verified by resolving them (content negotiation) rather
+  than from recall, and preprint status checked via the arXiv API.
 - **`vault-instruments` skill + `instruments/` directory.** A sourced reference
   record for scientific instruments, one file per instrument, with a generic
   `_templates/instrument.md` covering identity, observable, spatial coverage,
