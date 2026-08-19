@@ -57,6 +57,14 @@ User: "ask <handle> about the cal status"
 | Org-wide context | Quick reference only | `context/<org>.md`, `context/tools.md` |
 | Historical / stale | Remove | Keep in `memory/` |
 
+## Not memory: instrument facts
+
+`memory/` holds what the *user* means: people, projects, shorthand. Sourced
+external facts about hardware (fields of view, bandpasses, cadences, data
+levels, calibration factors) belong in `instruments/<NAME>.md` instead, where
+every value carries a link to its exact source. See the vault-instruments
+skill. A glossary row may name an instrument; it must not carry its numbers.
+
 ## Adding memory
 
 When the user says "remember this" / "X means Y" / introduces a new

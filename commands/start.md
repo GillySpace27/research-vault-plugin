@@ -28,10 +28,12 @@ creates it and interviews you to seed it.**
 If the vault has no `projects.md`, treat it as first-run. Do this:
 
 **a) Create the folder and skeleton.** Make the vault directory, plus
-`daily_notes/`, `memory/people/`, `memory/projects/`, `memory/context/`. Then:
+`daily_notes/`, `memory/people/`, `memory/projects/`, `memory/context/`,
+`instruments/`. Then:
 
-- Copy `_templates/project.md` and `_templates/daily-note.md` from
-  `${CLAUDE_PLUGIN_ROOT}/_templates/` into the vault's own `_templates/`.
+- Copy `_templates/project.md`, `_templates/daily-note.md`, and
+  `_templates/instrument.md` from `${CLAUDE_PLUGIN_ROOT}/_templates/` into the
+  vault's own `_templates/`.
 - Separately, seed `memory/glossary.md` by copying
   `${CLAUDE_PLUGIN_ROOT}/_templates/glossary.md`.
 
@@ -100,6 +102,7 @@ Check for the following — list what's present and what's missing:
 | `_templates/project.md` | New-project scaffold |
 | `daily_notes/` | Daily journal folder |
 | `memory/` | Two-tier memory deep storage |
+| `instruments/` | Sourced instrument reference (see vault-instruments skill) |
 
 Create only what's missing (from `${CLAUDE_PLUGIN_ROOT}/_templates/` or the
 `_examples/` shapes). **Never overwrite an existing file.**

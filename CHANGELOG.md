@@ -8,6 +8,18 @@ engine change to keep forks traceable. Format follows
 ## [Unreleased]
 
 ### Added
+- **`vault-instruments` skill + `instruments/` directory.** A sourced reference
+  record for scientific instruments, one file per instrument, with a generic
+  `_templates/instrument.md` covering identity, observable, spatial coverage,
+  spectral response, cadence, data levels, calibration, conventions, gotchas,
+  and access. Every factual row carries a source key resolving to an exact
+  locator (chapter, table, page, or FITS keyword) plus a clickable link to that
+  item, a retrieval date, and an evidence type. The skill fires whenever an
+  instrument is named anywhere in context, resolves it through an alias table
+  (`instruments/README.md`), and surfaces disagreements between the claim and
+  the record rather than silently preferring either. Includes a source
+  precedence order, a no-source-no-row rule, and a distinction between design
+  facts and frame facts.
 - **Papers tracker** (`papers.md`), a hot-cache list of papers/manuscripts
   parallel to `proposal-solicitations.md`. Papers get their own six-bucket
   shape (Untouched → Idea Scoped → Drafting Currently → Submitted / Under

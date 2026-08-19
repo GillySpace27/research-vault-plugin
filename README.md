@@ -92,6 +92,7 @@ conventions so future sessions don't need to be re-briefed.
 | `vault-status` | Six-bucket status grouping for proposals/projects. |
 | `vault-time` | Where the hours come from, what they mean, and their limits. |
 | `vault-memory` | Two-tier memory (vault `CLAUDE.md` hot cache + `memory/` deep storage). |
+| `vault-instruments` | Sourced instrument reference in `instruments/`; auto-checks any instrument claim against the vault and surfaces disagreements. |
 
 ## Vault layout created
 
@@ -117,7 +118,10 @@ conventions so future sessions don't need to be re-briefed.
 │   ├── people/<name>.md
 │   ├── projects/<name>.md
 │   └── context/
-└── _templates/          ← project.md, daily-note.md, glossary.md, dashboard.md, …
+├── instruments/         ← sourced instrument reference, one file per instrument
+│   ├── README.md        ← alias table ("C2" → LASCO.md) + the standing check
+│   └── <INSTRUMENT>.md  ← every number linked to its exact source
+└── _templates/          ← project.md, daily-note.md, instrument.md, glossary.md, …
 ```
 
 The `_examples/` folder in the plugin shows the intended shape of a filled-in
