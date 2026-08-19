@@ -8,6 +8,13 @@ engine change to keep forks traceable. Format follows
 ## [Unreleased]
 
 ### Added
+- **`§6 Data products and levels` split into two axes** (processing levels and
+  product codes) plus a retrieval block with archive layout, filename pattern,
+  versioning rule and a working one-liner. A single-axis level table cannot
+  express "product CTM at level 3", which made the section useless for any
+  mission with product codes. The skill now requires marking which levels are
+  distributed versus user-generated, decoding the code scheme rather than only
+  listing codes, and recording measured cadence next to designed cadence.
 - **Instrument files open with a `§0 Start here` document registry**: portals
   (official site, mission site, archive, search, quick-look, software, event
   catalog, local cache) plus tier 1/2/3 documents with DOIs, so the sources

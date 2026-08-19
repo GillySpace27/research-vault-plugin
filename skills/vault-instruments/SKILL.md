@@ -92,6 +92,32 @@ first authors get misremembered.
 
 Record the publication year the journal gives, not the one everybody says.
 
+## Products are a second axis, not a sub-list of levels
+
+`§6` carries **two** tables: processing levels, and product codes. Collapsing
+them is the most common way an instrument file becomes useless. PUNCH has
+twelve level-3 product codes over six levels; AIA has no product codes at all
+and three levels that matter. One table cannot say "CTM at level 3", and a
+reader who knows they want polarized data still cannot work out what to fetch.
+
+Three things belong here that are routinely missing:
+
+1. **Which levels are actually distributed**, versus user-generated. AIA's
+   level 1.5 and LASCO's level 1 both have to be produced by the user; assuming
+   an archive serves them wastes a day each time.
+2. **The code scheme, decoded.** PUNCH TYPECODEs are predictable once you know
+   first char = polarized/clear and last char = mosaic/NFI/WFI-unit. Decoding
+   the scheme beats listing every code, because it covers codes not yet seen.
+3. **A working retrieval one-liner**, with the filename pattern and the
+   versioning rule.
+
+Cadence belongs on the product row, not only in `§5`, because cadence is
+usually a property of the product rather than of the instrument.
+
+Where a live archive can be queried, record the **measured** cadence alongside
+the designed one. Agreement is a real check that the served data matches the
+paper; disagreement is a finding.
+
 ## Provenance rules
 
 These are the reason the directory is worth maintaining.

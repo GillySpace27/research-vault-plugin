@@ -130,14 +130,42 @@ applied.
 
 ## 6. Data products and levels
 
-What each level means *for this instrument*, since level numbering is not
-standardized across missions. Mark explicitly which levels are actually
-distributed and which are user-generated, because that distinction wastes more
-time than any other single fact in this file.
+**Levels and products are two independent axes.** One table cannot express
+"product CTM at level 3", and collapsing them is the most common way an
+instrument file becomes useless: a reader who knows they want polarized data
+still cannot work out what to download. Give both tables.
 
-| Level | Contents | Distributed? | Source |
+Mark explicitly which levels are actually *distributed* and which are
+user-generated. That distinction wastes more time than any other single fact in
+this file.
+
+### Processing levels
+
+| Level | Meaning | Distributed? | Source |
 |---|---|---|---|
 | | | | |
+
+### Products
+
+One row per retrievable product code, with the observable it carries. If the
+mission has no product codes (a single-product instrument), delete this table
+and say so.
+
+| Code | Observable | Level(s) | Cadence | Source |
+|---|---|---|---|---|
+| | | | | |
+
+Decode the code scheme itself if there is one, because it lets a reader predict
+a code they have not seen rather than look every one up.
+
+### Retrieval
+
+| Property | Value |
+|---|---|
+| Archive layout | `{root}/{level}/{CODE}/{YYYY}/{MM}/{DD}/` or equivalent |
+| Filename pattern | |
+| Versioning | how multiple versions of one observation are distinguished |
+| Programmatic access | Fido / curl / API, with a working one-liner |
 
 ## 7. Calibration and units
 
