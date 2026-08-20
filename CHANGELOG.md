@@ -7,6 +7,8 @@ engine change to keep forks traceable. Format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-20
+
 ### Added
 - **`§6 Data products and levels` split into two axes** (processing levels and
   product codes) plus a retrieval block with archive layout, filename pattern,
