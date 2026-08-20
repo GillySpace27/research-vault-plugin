@@ -66,10 +66,28 @@ def main():
         bad, warn = lint(p), []
         if "--urls" in sys.argv:
             import urllib.request
+            # A soft 404 answers 200 with a "not found" body. Status alone
+            # passed sidc.be/P3SC_archive/ as healthy while it served an error
+            # page, so the real archive went unrecorded for a day. GET a little
+            # of the body and look at it.
+            SOFT = ("page not found", "404 not found", "not found",
+                    "page doesn't exist", "page does not exist",
+                    "no longer available", "error 404")
             for u in sorted(set(URL.findall(p.read_text()))):
                 try:
-                    urllib.request.urlopen(urllib.request.Request(
-                        u, method="HEAD", headers={"User-Agent": "vault-lint"}), timeout=15)
+                    r = urllib.request.urlopen(urllib.request.Request(
+                        u, headers={"User-Agent": "Mozilla/5.0 (vault-lint)"}),
+                        timeout=20)
+                    ct = (r.headers.get("Content-Type") or "").lower()
+                    if "html" in ct or ct == "":
+                        head = r.read(6000).decode("utf-8", "replace").lower()
+                        title = ""
+                        if "<title" in head:
+                            s = head.index("<title"); s = head.index(">", s) + 1
+                            title = head[s:head.index("</title>", s)] if "</title>" in head[s:s+400] else head[s:s+200]
+                        hay = title + " " + head[:1500]
+                        if any(k in hay for k in SOFT):
+                            bad.append(f"soft 404 (HTTP 200, body says not found): {u}")
                 except Exception as e:
                     # A cert chain the server failed to send, or a host that
                     # refuses robots, is not a dead link. Report, don't fail.
