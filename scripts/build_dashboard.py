@@ -33,19 +33,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-SKIP_FILES = {"README.md", "CLAUDE.md", "dashboard.md", "journaling.md", "projects.md"}
-SKIP_DIRS = {".git", ".obsidian", "_templates", "memory", "daily_notes", ".claude",
-             "baseline", "nwra-intranet-mirror", "misc", "time_tracking"}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from vault_parse import iter_notes, parse_task              # noqa: E402
 PAPERS_FILE = "papers.md"
 PROPOSALS_FILE = "proposals/proposal-solicitations.md"
 
-EMOJI_DUE, EMOJI_SCHED, EMOJI_DONE = "\U0001f4c5", "⏳", "✅"
-EMOJI_HIGH, EMOJI_LOW = "\U0001f53c", "\U0001f53d"
-EMOJI_URGENT = ("\U0001f525", "\U0001f6a8", "⏫", "\U0001f534")  # 🔥 🚨 ⏫ 🔴
-
-DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
-PERSON_RE = re.compile(r"#([a-z0-9][a-z0-9-]*)")
-TASK_RE = re.compile(r"^\s*-\s\[([ xX])\]\s+(.*)$")
 BUCKET_RE = re.compile(r"^###\s+(.*?)\s*$")
 ENTRY_RE = re.compile(r"^-\s\[([ xX])\]\s+(.*)$")   # top-level only: sub-bullets are indented
 LINKED_FILE_RE = re.compile(r"`([a-z0-9\-/]+\.md)`|\[\[([a-z0-9\-]+)\]\]")
@@ -61,42 +53,9 @@ PRIORITY_WEIGHT = {"high": 1.5, None: 1.0, "low": 0.5}
 # ------------------------------------------------------------------ parsing
 
 
-def parse_task(line: str) -> dict | None:
-    m = TASK_RE.match(line)
-    if not m:
-        return None
-    text = m.group(2)
-    out = {"done": m.group(1).lower() == "x", "due": None,
-           "sched": None, "completed": None, "priority": None, "people": []}
-    for token, key in ((EMOJI_DUE, "due"), (EMOJI_SCHED, "sched"), (EMOJI_DONE, "completed")):
-        idx = text.find(token)
-        if idx != -1:
-            dm = DATE_RE.match(text[idx + len(token):].lstrip())
-            if dm:
-                out[key] = dm.group(1)
-    if EMOJI_HIGH in text:
-        out["priority"] = "high"
-    elif EMOJI_LOW in text:
-        out["priority"] = "low"
-    out["urgent"] = any(e in text for e in EMOJI_URGENT)
-    out["people"] = PERSON_RE.findall(text)
-    display = text
-    for emo in (EMOJI_DUE, EMOJI_SCHED, EMOJI_DONE):
-        display = re.sub(re.escape(emo) + r"\s*\d{4}-\d{2}-\d{2}", "", display)
-    display = display.replace(EMOJI_HIGH, "").replace(EMOJI_LOW, "")
-    display = re.sub(r"\*\*(.+?)\*\*", r"\1", display)
-    display = re.sub(r"`([^`]+)`", r"\1", display)
-    out["display"] = re.sub(r"\s+", " ", display).strip(" :-")
-    return out
-
-
 def walk_vault(vault: Path) -> dict[str, list[dict]]:
     by_file: dict[str, list[dict]] = {}
-    for md in sorted(vault.rglob("*.md")):
-        rel = md.relative_to(vault)
-        if any(part in SKIP_DIRS for part in rel.parts[:-1]) or md.name in SKIP_FILES:
-            continue
-        key = rel.as_posix()
+    for key, md in iter_notes(vault):
         tasks = []
         for i, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
             parsed = parse_task(line)
