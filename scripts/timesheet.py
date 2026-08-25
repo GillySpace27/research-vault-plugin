@@ -42,6 +42,7 @@ TRANSCRIPTS = os.path.expanduser("~/.claude/projects")
 CONFIG_REL = "time_tracking/config.json"
 EVENTS_REL = "time_tracking/events.tsv"
 SUBMITTED_REL = "time_tracking/submitted.json"
+BILLED_REL = "time_tracking/billed.json"
 
 DEFAULT_CONFIG = {
     "idle_gap_minutes": 10,
@@ -461,6 +462,62 @@ def submitted_periods():
         return set()
 
 
+def billed_for(key):
+    """What actually went onto the card, per charge code.
+
+    Measured hours and billed hours are different quantities and the difference
+    is the interesting part, so this is never derived from the scan: it is what
+    the form says, recorded separately. The NWRA timecard sits behind Entra SSO
+    and cannot be read by a headless process, so `source` records how these
+    numbers got here and the reconciliation is only ever as good as that.
+    """
+    try:
+        with open(os.path.join(VAULT, BILLED_REL)) as fh:
+            return json.load(fh).get("periods", {}).get(key)
+    except (OSError, ValueError):
+        return None
+
+
+def reconcile(summary, billed):
+    """Worked against billed, per charge code.
+
+    Both directions matter and mean opposite things. Billed above worked is the
+    one that must never pass quietly, because that is an overcharge to a
+    federal grant. Billed below worked is Gilly absorbing hours, which is his
+    call to make but should still be visible.
+    """
+    if not billed:
+        return None
+    worked = defaultdict(float)
+    for p in summary["projects"]:
+        if p["billable"] and p["charge"]:
+            worked[p["charge"]] += p["hours"]
+    rows_in = {k: float(v) for k, v in (billed.get("rows") or {}).items()}
+    rows = []
+    for code in sorted(set(worked) | set(rows_in)):
+        w, b = round(worked.get(code, 0.0), 2), round(rows_in.get(code, 0.0), 2)
+        # A code whose only work rounded away is neither worked nor billed, and
+        # a 0.00/0.00 row is noise in a table read for its non-zero entries.
+        if not w and not b:
+            continue
+        rows.append({"charge": code, "worked": w, "billed": b,
+                     "delta": round(b - w, 2)})
+    tw = round(sum(r["worked"] for r in rows), 2)
+    tb = round(sum(r["billed"] for r in rows), 2)
+    return {
+        "source": billed.get("source", "unknown"),
+        "at": billed.get("at"),
+        "rows": rows,
+        "worked_total": tw,
+        "billed_total": tb,
+        "delta": round(tb - tw, 2),
+        # Codes billed that carry no measured work at all: the shape of an
+        # error worth catching before the card is certified, not after.
+        "billed_unworked": [r["charge"] for r in rows if r["billed"] and not r["worked"]],
+        "over": [r["charge"] for r in rows if r["delta"] > 0.01],
+    }
+
+
 def period_meta(cfg, start, end):
     """Calendar facts about a pay period: when it closes, when it gets paid.
 
@@ -555,6 +612,30 @@ def selftest():
           (lo + timedelta(hours=2), lo + timedelta(hours=3), "-zz", 1.0)]
     got = summarise(dict(cfg, **mapped), lo, hi, intervals=iv)
     assert got["billable"] == 2.0 and got["coded"] == 1.0 and got["uncoded"] == 1.0, got
+
+    # reconciliation: worked vs what the form actually says
+    s = {"projects": [
+        {"project": "A", "charge": "C1", "billable": True,  "hours": 10.0},
+        {"project": "B", "charge": "C1", "billable": True,  "hours": 2.0},   # same code
+        {"project": "C", "charge": "C2", "billable": True,  "hours": 4.0},
+        {"project": "D", "charge": "",   "billable": True,  "hours": 9.0},   # uncoded
+        {"project": "E", "charge": "C9", "billable": False, "hours": 5.0},   # non-billable
+    ]}
+    assert reconcile(s, None) is None                       # nothing recorded yet
+    r = reconcile(s, {"source": "manual", "rows": {"C1": 12.0, "C2": 6.0, "C3": 1.0}})
+    by = {x["charge"]: x for x in r["rows"]}
+    assert by["C1"]["worked"] == 12.0 and by["C1"]["delta"] == 0.0   # two projects, one code
+    assert by["C2"]["delta"] == 2.0                                  # billed above worked
+    assert by["C3"]["worked"] == 0.0 and by["C3"]["billed"] == 1.0
+    assert "C9" not in by and "" not in by      # non-billable and uncoded never reconcile
+    assert r["worked_total"] == 16.0 and r["billed_total"] == 19.0 and r["delta"] == 3.0
+    assert r["billed_unworked"] == ["C3"]       # billed a code with no measured work
+    assert sorted(r["over"]) == ["C2", "C3"]    # both overcharge a grant
+    r2 = reconcile(s, {"source": "manual", "rows": {"C1": 12.0, "C2": 4.0}})
+    assert r2["over"] == [] and r2["delta"] == 0.0
+    # a code that rounded away entirely and was never billed is not a row
+    s3 = {"projects": [{"project": "F", "charge": "C0", "billable": True, "hours": 0.0}]}
+    assert reconcile(s3, {"source": "manual", "rows": {}})["rows"] == []
     print("selftest ok")
 
 
@@ -595,6 +676,8 @@ def main():
         out = summarise(cfg, lo, hi)
         out["mode"] = args.mode
         out["period"] = meta
+        out["reconcile"] = (reconcile(out, billed_for(meta["key"]))
+                            if args.mode == "period" else None)
         out["generated"] = datetime.now().astimezone().isoformat(timespec="seconds")
         print(json.dumps(out, indent=1, sort_keys=True))
         return
