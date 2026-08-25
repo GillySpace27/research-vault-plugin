@@ -41,6 +41,7 @@ VAULT = os.path.expanduser(os.environ.get("RESEARCH_VAULT_DIR") or "~/research-v
 TRANSCRIPTS = os.path.expanduser("~/.claude/projects")
 CONFIG_REL = "time_tracking/config.json"
 EVENTS_REL = "time_tracking/events.tsv"
+SUBMITTED_REL = "time_tracking/submitted.json"
 
 DEFAULT_CONFIG = {
     "idle_gap_minutes": 10,
@@ -245,11 +246,19 @@ def q(cfg, minutes):
 # ------------------------------------------------------------------ rendering
 
 
-def render(cfg, lo, hi, title):
-    intervals = scan_transcripts(cfg, lo, hi) + load_events(cfg, lo, hi)
+def summarise(cfg, lo, hi, intervals=None):
+    """Every number the period has to offer, computed once.
+
+    Split out of render() so the markdown rollup and any other consumer (the
+    Orrery's timecard page) cannot drift apart: two formatters over one
+    computation, never two computations. Minutes stay unrounded here; rounding
+    is a presentation choice and q() is applied at the edge.
+    """
+    # intervals are injectable so the charged/uncoded split can be tested
+    # without a transcript tree; production always passes None.
+    if intervals is None:
+        intervals = scan_transcripts(cfg, lo, hi) + load_events(cfg, lo, hi)
     norm, raw, wall = allocate(intervals, lo, hi)
-    if not norm:
-        return f"_No tracked activity for {title}._\n"
 
     merged = defaultdict(lambda: [0.0, 0.0])  # several dirs can be one project
     for key, mins in norm.items():
@@ -258,54 +267,93 @@ def render(cfg, lo, hi, title):
     rows = [(p, c, b, m, r) for (p, c, b), (m, r) in merged.items()]
     rows.sort(key=lambda r: -r[3])
 
-    leave_total = sum(r[3] for r in rows if r[0] == cfg["leave_label"])
-    billable_total = sum(r[3] for r in rows if r[2] and r[0] != cfg["leave_label"])
+    leave = sum(r[3] for r in rows if r[0] == cfg["leave_label"])
+    work = [r for r in rows if r[2] and r[0] != cfg["leave_label"]]
+    billable = sum(r[3] for r in work)
+    # An unregistered directory resolves to billable=True with an EMPTY charge
+    # code, which is the right optimistic default (assume work is chargeable
+    # until told otherwise) but must never be folded into a "charged" total: a
+    # code is exactly what a timecard row needs and these have none. Reported
+    # separately so the number that can actually be typed onto a form is the
+    # number the form gets.
+    coded = sum(r[3] for r in work if r[1])
+    uncoded = billable - coded
+    target = target_hours(cfg, lo, hi)
+    projects = [
+        {"project": p, "charge": c, "billable": b,
+         "hours": q(cfg, m), "raw": q(cfg, r), "minutes": m}
+        for p, c, b, m, r in rows if p != cfg["leave_label"]
+    ]
+    return {
+        "empty": not norm,
+        "projects": projects,
+        "dust": [p["project"] for p in projects if p["hours"] == 0],
+        "unmapped": [p["project"][len("unmapped: "):] for p in projects
+                     if p["project"].startswith("unmapped: ")],
+        "billable": q(cfg, billable),
+        "coded": q(cfg, coded),
+        "uncoded": q(cfg, uncoded),
+        "leave": q(cfg, leave),
+        "card_total": q(cfg, billable + leave),
+        "wall": q(cfg, wall),
+        "target": round(target, 2),
+        # Leave is paid, so it counts toward the target the same as charged work.
+        "met": (billable + leave) / 60.0 / target if target else None,
+        "overlap": q(cfg, max(0.0, sum(r[4] for r in rows) - sum(r[3] for r in rows))),
+        "leave_label": cfg["leave_label"],
+        "target_per_week": cfg["target_hours_per_week"],
+        "idle_gap_minutes": cfg["idle_gap_minutes"],
+        "meeting_weight": cfg["meeting_weight"],
+    }
+
+
+def render(cfg, lo, hi, title):
+    s = summarise(cfg, lo, hi)
+    if s["empty"]:
+        return f"_No tracked activity for {title}._\n"
+
     lines = [
         f"| Project | Charge | Hours | Raw |",
         f"|---|---|---|---|",
     ]
     dust = 0.0
-    for project, charge, billable, mins, rawmins in rows:
-        if project == cfg["leave_label"]:  # paid, but not charged to a project
+    for p in s["projects"]:
+        if p["hours"] == 0:  # rounds away; keep the table readable
+            dust += p["minutes"]
             continue
-        if q(cfg, mins) == 0:  # rounds away; keep the table readable
-            dust += mins
-            continue
-        label = project if billable else f"{project} (non-billable)"
-        lines.append(f"| {label} | {charge} | {q(cfg, mins):.2f} | {q(cfg, rawmins):.2f} |")
-    if dust:
-        lines.append(f"| _{sum(1 for r in rows if q(cfg, r[3]) == 0)} project(s) under "
+        label = p["project"] if p["billable"] else f"{p['project']} (non-billable)"
+        lines.append(f"| {label} | {p['charge']} | {p['hours']:.2f} | {p['raw']:.2f} |")
+    if s["dust"]:
+        lines.append(f"| _{len(s['dust'])} project(s) under "
                      f"the rounding floor_ | | 0.00 | {q(cfg, dust):.2f} |")
-    lines.append(f"| **Charged to projects** | | **{q(cfg, billable_total):.2f}** | |")
-    if leave_total:
-        lines.append(f"| {cfg['leave_label']} | | {q(cfg, leave_total):.2f} | |")
-        lines.append(f"| **Card total** | | **{q(cfg, billable_total + leave_total):.2f}** | |")
-    lines.append(f"| Wall clock at keyboard | | {q(cfg, wall):.2f} | |")
-    target = target_hours(cfg, lo, hi)
-    if target:
-        # the target is paid hours, so leave counts toward it
-        paid = (billable_total + leave_total) / 60.0
-        lines.append(f"| Target ({cfg['target_hours_per_week']} h/wk) | | "
-                     f"{target:.2f} | {paid / target:.0%} met |")
+    lines.append(f"| **Charged to a code** | | **{s['coded']:.2f}** | |")
+    if s["uncoded"]:
+        lines.append(f"| Billable but uncoded | | {s['uncoded']:.2f} | |")
+    if s["leave"]:
+        lines.append(f"| {s['leave_label']} | | {s['leave']:.2f} | |")
+    if s["leave"] or s["uncoded"]:
+        lines.append(f"| **Card total** | | **{s['card_total']:.2f}** | |")
+    lines.append(f"| Wall clock at keyboard | | {s['wall']:.2f} | |")
+    if s["target"]:
+        lines.append(f"| Target ({s['target_per_week']} h/wk) | | "
+                     f"{s['target']:.2f} | {s['met']:.0%} met |")
 
-    overlap = sum(r[4] for r in rows) - sum(r[3] for r in rows)
     notes = [
         "",
         f"_{title}. Generated {datetime.now():%Y-%m-%d %H:%M} by `scripts/timesheet.py` "
-        f"from Claude Code session transcripts (idle gap {cfg['idle_gap_minutes']} min) "
+        f"from Claude Code session transcripts (idle gap {s['idle_gap_minutes']} min) "
         f"and `{EVENTS_REL}`. Presence time, not a certified timecard: review before "
         f"it goes on one._",
     ]
-    if overlap > 1:
+    if s["overlap"] > 1:
         notes.append(
-            f"_Concurrency: {q(cfg, overlap):.2f} h of the Raw column is double-counted "
+            f"_Concurrency: {s['overlap']:.2f} h of the Raw column is double-counted "
             f"parallel work. The Hours column splits those minutes by weight "
-            f"(meetings {cfg['meeting_weight']:g}x sessions)._"
+            f"(meetings {s['meeting_weight']:g}x sessions)._"
         )
-    unmapped = [r[0] for r in rows if r[0].startswith("unmapped: ")]
-    if unmapped:
+    if s["unmapped"]:
         notes.append(
-            f"_{len(unmapped)} unmapped source dir(s): add them to `{CONFIG_REL}` "
+            f"_{len(s['unmapped'])} unmapped source dir(s): add them to `{CONFIG_REL}` "
             f"to get a project name and charge code._"
         )
     return "\n".join(lines + notes) + "\n"
@@ -393,6 +441,50 @@ def period_bounds(cfg, day):
     return day.replace(day=16), nxt
 
 
+def period_key(start, end):
+    """The name this period is filed under, matching daily_notes/periods/."""
+    return f"{start}_to_{end - timedelta(days=1)}"
+
+
+def submitted_periods():
+    """Periods Gilly has said went onto an actual timecard.
+
+    Without this the "period closed" signal is just a calendar fact and would
+    light up every single period forever, which is the fastest way to teach
+    someone to ignore an indicator. Recording the submission is what turns it
+    back into a question that can be answered.
+    """
+    try:
+        with open(os.path.join(VAULT, SUBMITTED_REL)) as fh:
+            return set(json.load(fh).get("periods", []))
+    except (OSError, ValueError):
+        return set()
+
+
+def period_meta(cfg, start, end):
+    """Calendar facts about a pay period: when it closes, when it gets paid.
+
+    NWRA pays on the 6th and the 21st; cards are due some days before that, but
+    "often the preceding week" is as precise as the rule actually is, so the due
+    date is an estimate and is labelled as one rather than dressed up.
+    """
+    today = date.today()
+    last = end - timedelta(days=1)
+    payday = (last.replace(day=21) if last.day <= 15
+              else (last.replace(day=28) + timedelta(days=4)).replace(day=6))
+    due = payday - timedelta(days=cfg.get("card_due_days_before_pay", 5))
+    return {
+        "start": start.isoformat(), "end": last.isoformat(),
+        "key": period_key(start, end),
+        "closed": today > last,
+        "days_left": (last - today).days,
+        "payday": payday.isoformat(),
+        "due_estimate": due.isoformat(),
+        "days_to_due": (due - today).days,
+        "submitted": period_key(start, end) in submitted_periods(),
+    }
+
+
 def cmd_init():
     cfg = load_config()
     for path in sorted(glob.glob(os.path.join(TRANSCRIPTS, "*"))):
@@ -443,6 +535,26 @@ def selftest():
     bi = dict(cfg, pay_period="biweekly")
     assert period_bounds(bi, date(2026, 1, 6)) == (date(2026, 1, 5), date(2026, 1, 19))
     assert period_bounds(bi, date(2026, 1, 4))[0] == date(2025, 12, 22)  # before anchor
+
+    # the first half is paid on the 21st, the second half on the 6th of the NEXT month
+    assert period_meta(cfg, date(2026, 8, 1), date(2026, 8, 16))["payday"] == "2026-08-21"
+    assert period_meta(cfg, date(2026, 8, 16), date(2026, 9, 1))["payday"] == "2026-09-06"
+    assert period_meta(cfg, date(2026, 12, 16), date(2027, 1, 1))["payday"] == "2027-01-06"
+    assert period_meta(cfg, date(2026, 8, 1), date(2026, 8, 16))["closed"]  # long past
+    assert period_key(date(2026, 8, 16), date(2026, 9, 1)) == "2026-08-16_to_2026-08-31"
+
+    # summarise() and render() must agree: one computation, two formatters
+    s = summarise(dict(cfg, target_hours_per_week=30), lo, hi)
+    assert s["empty"] and "No tracked activity" in render(cfg, lo, hi, "t")
+
+    # an unregistered dir is billable but has no code, so it can never be
+    # counted as charged — the number that goes on the form
+    assert resolve(cfg, "-Users-gilly-nope") == ("unmapped: gilly/nope", "", True)
+    mapped = {"projects": {"-a": {"project": "A", "charge": "C1"}}}
+    iv = [(lo, lo + timedelta(minutes=60), "-a", 1.0),
+          (lo + timedelta(hours=2), lo + timedelta(hours=3), "-zz", 1.0)]
+    got = summarise(dict(cfg, **mapped), lo, hi, intervals=iv)
+    assert got["billable"] == 2.0 and got["coded"] == 1.0 and got["uncoded"] == 1.0, got
     print("selftest ok")
 
 
@@ -455,6 +567,8 @@ def main():
     ap.add_argument("--write", action="store_true", help="patch the vault files")
     ap.add_argument("--by-day", action="store_true",
                     help="project x day matrix instead of one total (week/period)")
+    ap.add_argument("--json", action="store_true",
+                    help="emit the numbers as JSON instead of markdown")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -465,6 +579,25 @@ def main():
 
     cfg = load_config()
     day = date.fromisoformat(args.date) if args.date else date.today()
+
+    if args.json:
+        if args.mode == "day":
+            start, end = day, day + timedelta(days=1)
+            meta = {"start": day.isoformat(), "end": day.isoformat()}
+        elif args.mode == "week":
+            start = day - timedelta(days=day.weekday())
+            end = start + timedelta(days=7)
+            meta = {"start": start.isoformat(), "end": (end - timedelta(days=1)).isoformat()}
+        else:
+            start, end = period_bounds(cfg, day)
+            meta = period_meta(cfg, start, end)
+        lo, hi = datetime.combine(start, time()), datetime.combine(end, time())
+        out = summarise(cfg, lo, hi)
+        out["mode"] = args.mode
+        out["period"] = meta
+        out["generated"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        print(json.dumps(out, indent=1, sort_keys=True))
+        return
 
     if args.mode == "day":
         lo, hi = datetime.combine(day, time()), datetime.combine(day, time()) + timedelta(days=1)
