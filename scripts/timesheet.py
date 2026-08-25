@@ -109,6 +109,28 @@ def parse_ts(raw):
     return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
 
 
+def _has_user_text(line):
+    """True if this transcript line is a user turn carrying real text.
+
+    Tool results and injected system-reminder blocks also arrive as type "user",
+    so the text is required to be non-empty and not to open with a tag.
+    """
+    try:
+        rec = json.loads(line)
+    except ValueError:
+        return False
+    if rec.get("type") != "user" or not isinstance(rec.get("message"), dict):
+        return False
+    content = rec["message"].get("content")
+    if isinstance(content, str):
+        text = content
+    else:
+        text = " ".join(b.get("text", "") for b in (content or [])
+                        if isinstance(b, dict))
+    text = (text or "").strip()
+    return bool(text) and not text.startswith("<")
+
+
 def scan_transcripts(cfg, lo, hi):
     """Return [(start, end, dir_key, weight)] of active segments overlapping [lo, hi)."""
     gap = timedelta(minutes=cfg["idle_gap_minutes"])
@@ -116,10 +138,12 @@ def scan_transcripts(cfg, lo, hi):
     out = []
     for path in glob.glob(os.path.join(TRANSCRIPTS, "*", "*.jsonl")):
         key = os.path.basename(os.path.dirname(path))
-        stamps = []
+        stamps, spoken = [], False
         try:
             with open(path, errors="replace") as fh:
                 for line in fh:
+                    if '"type":"user"' in line or '"type": "user"' in line:
+                        spoken = spoken or _has_user_text(line)
                     # cheap prefilter: skip lines with no timestamp at all
                     if '"timestamp"' not in line:
                         continue
@@ -131,6 +155,12 @@ def scan_transcripts(cfg, lo, hi):
         except OSError:
             continue
         if not stamps:
+            continue
+        # A transcript in which Gilly never said anything is not presence. These
+        # are queue, hook and attachment records from sessions launched in the
+        # background; 116 of them were contributing 2.75 h of "wall clock at the
+        # keyboard" in a period where nobody was at the keyboard for any of it.
+        if cfg.get("require_user_turn", True) and not spoken:
             continue
         stamps.sort()
         seg_start = prev = stamps[0]
@@ -599,6 +629,17 @@ def selftest():
     assert period_meta(cfg, date(2026, 12, 16), date(2027, 1, 1))["payday"] == "2027-01-06"
     assert period_meta(cfg, date(2026, 8, 1), date(2026, 8, 16))["closed"]  # long past
     assert period_key(date(2026, 8, 16), date(2026, 9, 1)) == "2026-08-16_to_2026-08-31"
+
+    # a user turn is real text, not a tool result or an injected reminder
+    mk = lambda t: json.dumps({"type": "user", "message": {"content": t}})
+    assert _has_user_text(mk("please fix the parser"))
+    assert _has_user_text(json.dumps({"type": "user", "message": {
+        "content": [{"type": "text", "text": "hello"}]}}))
+    assert not _has_user_text(mk(""))
+    assert not _has_user_text(mk("   "))
+    assert not _has_user_text(mk("<system-reminder>noise</system-reminder>"))
+    assert not _has_user_text(json.dumps({"type": "assistant", "message": {"content": "hi"}}))
+    assert not _has_user_text("not json at all")
 
     # summarise() and render() must agree: one computation, two formatters
     s = summarise(dict(cfg, target_hours_per_week=30), lo, hi)
