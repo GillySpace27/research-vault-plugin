@@ -431,6 +431,62 @@ def render_by_day(cfg, lo, hi, title):
         f"not a certified timecard._\n")
 
 
+def grid(cfg, lo, hi):
+    """Day x charge-code grid: the shape you type into, one form line per day.
+
+    render_by_day() is the transpose of this and exists to be READ. A timecard
+    is filled in a row at a time, so the axis that has to be scannable is the
+    day, and the columns have to be the codes on the form.
+
+    Scans ONCE over the whole period and re-allocates per day from the same
+    intervals, rather than re-walking every transcript sixteen times. allocate()
+    clips to its window, so a day's concurrency is still resolved within that
+    day, which is the semantics that matter.
+    """
+    intervals = scan_transcripts(cfg, lo, hi) + load_events(cfg, lo, hi)
+    days = [lo + timedelta(days=n) for n in range((hi - lo).days)]
+    order = list(cfg.get("charge_order") or [])
+    labels = dict(cfg.get("charge_labels") or {})
+
+    rows, seen = [], set()
+    for start in days:
+        end = start + timedelta(days=1)
+        norm, _, _ = allocate(intervals, start, end)
+        cells, leave, off = defaultdict(float), 0.0, 0.0
+        for key, mins in norm.items():
+            project, charge, billable = resolve(cfg, key)
+            if project == cfg["leave_label"]:
+                leave += mins
+            elif billable and charge:
+                cells[charge] += mins
+                seen.add(charge)
+            else:
+                off += mins            # non-billable or uncoded: no form row exists
+        row = {"date": start.date().isoformat(),
+               "dow": start.strftime("%a"),
+               "weekend": start.weekday() >= 5,
+               "cells": {c: q(cfg, m) for c, m in cells.items()},
+               "leave": q(cfg, leave),
+               "offcard": q(cfg, off)}
+        row["oncard"] = round(sum(row["cells"].values()) + row["leave"], 2)
+        rows.append(row)
+
+    columns = [c for c in order if c in seen or c in order]
+    columns += sorted(c for c in seen if c not in columns)
+
+    # Totals are the sum of the ROUNDED daily cells, not the period figure.
+    # Those differ, because rounding sixteen days and adding is not the same as
+    # adding and rounding once. What Gilly types is the daily numbers, so the
+    # column total has to be what his own column will add up to.
+    totals = {c: round(sum(r["cells"].get(c, 0.0) for r in rows), 2) for c in columns}
+    totals["__leave"] = round(sum(r["leave"] for r in rows), 2)
+    totals["__offcard"] = round(sum(r["offcard"] for r in rows), 2)
+    totals["__oncard"] = round(sum(r["oncard"] for r in rows), 2)
+    return {"days": [d.date().isoformat() for d in days],
+            "columns": [{"charge": c, "label": labels.get(c, "")} for c in columns],
+            "rows": rows, "totals": totals}
+
+
 # -------------------------------------------------------------------- writing
 
 
@@ -719,6 +775,7 @@ def main():
         out["period"] = meta
         out["reconcile"] = (reconcile(out, billed_for(meta["key"]))
                             if args.mode == "period" else None)
+        out["grid"] = grid(cfg, lo, hi)
         out["generated"] = datetime.now().astimezone().isoformat(timespec="seconds")
         print(json.dumps(out, indent=1, sort_keys=True))
         return
