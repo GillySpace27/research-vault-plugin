@@ -202,7 +202,7 @@ def assign_labels(cfg, labels: list[str], files: list[str]) -> dict[str, str]:
 
     An explicit `"file"` on a config entry wins. Everything else is matched by
     word overlap, greedily, best score first: without the one-to-one rule two
-    files that share a word (solar-archive / heliograph-live) would each claim
+    files that share a word (solar-archive / heliogram-live) would each claim
     the same hours and the totals would double-count.
     """
     out: dict[str, str] = {}
