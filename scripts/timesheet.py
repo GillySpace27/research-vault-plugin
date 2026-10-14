@@ -75,8 +75,22 @@ def load_config():
     return cfg
 
 
+# Claude's per-session scratch directories. A new one appears for every session
+# that uses one, so left alone they breed config entries faster than anyone can
+# map them: fifteen unknown dirs, nine of them scratch, within six weeks.
+SCRATCH_MARK = "-Library-Application-Support-Claude-scratch-workspaces-"
+
+
 def dir_key(dirname):
-    """Collapse worktree dirs onto their parent repo: worktrees are the same project."""
+    """Collapse a session dir onto the thing it is really work ON.
+
+    Worktrees collapse onto their parent repo, because a worktree is the same
+    project. Scratch workspaces collapse onto a single key for the same reason
+    in reverse: they are no project at all, and they are disposable, so the one
+    useful thing to say about them is said once rather than once per session.
+    """
+    if SCRATCH_MARK in dirname:
+        return dirname.split(SCRATCH_MARK)[0] + SCRATCH_MARK.rstrip("-")
     return dirname.split("--claude-worktrees-")[0]
 
 
@@ -131,6 +145,26 @@ def _has_user_text(line):
     return bool(text) and not text.startswith("<")
 
 
+def _is_sdk_driven(line):
+    """True if this line shows the session being driven by the SDK, not a human.
+
+    Claude Code records how the session was opened. One Gilly typed into reports
+    entrypoint "claude-desktop" or "cli"; one an automation opened reports
+    "sdk-cli". That is a structural fact, which is why it is used here instead
+    of matching the prompt text: the polling prompts change whenever the
+    automation does, and a heuristic that read them would quietly stop working.
+
+    ENTRYPOINT ONLY. promptSource is "sdk" on ordinary desktop sessions too, so
+    testing it condemned 6.75 h of real vault work along with the robots, and
+    turnOrigin is recorded too rarely to lean on. Measured before trusting.
+    """
+    try:
+        rec = json.loads(line)
+    except ValueError:
+        return False
+    return rec.get("entrypoint") == "sdk-cli"
+
+
 def scan_transcripts(cfg, lo, hi):
     """Return [(start, end, dir_key, weight)] of active segments overlapping [lo, hi)."""
     gap = timedelta(minutes=cfg["idle_gap_minutes"])
@@ -138,10 +172,12 @@ def scan_transcripts(cfg, lo, hi):
     out = []
     for path in glob.glob(os.path.join(TRANSCRIPTS, "*", "*.jsonl")):
         key = os.path.basename(os.path.dirname(path))
-        stamps, spoken = [], False
+        stamps, spoken, driven = [], False, False
         try:
             with open(path, errors="replace") as fh:
                 for line in fh:
+                    if '"entrypoint"' in line:
+                        driven = driven or _is_sdk_driven(line)
                     if '"type":"user"' in line or '"type": "user"' in line:
                         spoken = spoken or _has_user_text(line)
                     # cheap prefilter: skip lines with no timestamp at all
@@ -161,6 +197,15 @@ def scan_transcripts(cfg, lo, hi):
         # background; 116 of them were contributing 2.75 h of "wall clock at the
         # keyboard" in a period where nobody was at the keyboard for any of it.
         if cfg.get("require_user_turn", True) and not spoken:
+            continue
+        # Nor is a session a PROGRAM drove. These carry a real user turn, so the
+        # rule above waves them through, but the turn was written by software:
+        # "Call outlook_email_search ... output ONLY a JSON object". 6154 such
+        # transcripts sat in the home directory, one of them spanning 30 hours,
+        # and together they claimed 33.75 billable hours in a fortnight nobody
+        # had worked. Charging that to a grant is the specific thing this whole
+        # script must never do.
+        if cfg.get("ignore_sdk_sessions", True) and driven:
             continue
         stamps.sort()
         seg_start = prev = stamps[0]
@@ -628,20 +673,53 @@ def period_meta(cfg, start, end):
     }
 
 
-def cmd_init():
+def cmd_init(dry_run=False):
+    """Add newly-seen session dirs to the config, never touching existing ones.
+
+    New entries default to billable with no charge code, which is the honest
+    optimistic state: the work probably IS chargeable, but a code is what a
+    timecard row needs, so until one is filled in the hours report as
+    "billable but uncoded" rather than quietly joining a grant total.
+    """
     cfg = load_config()
+    known = set(cfg["projects"])
+    added = {}
     for path in sorted(glob.glob(os.path.join(TRANSCRIPTS, "*"))):
         if not os.path.isdir(path):
             continue
         key = dir_key(os.path.basename(path))
+        if key in known or key in added:
+            continue
         guess = key.replace("-Users-", "", 1).replace("-", "/")
         guess = guess.split("/", 1)[1] if "/" in guess else guess  # drop the username
-        cfg["projects"].setdefault(key, {"project": guess, "charge": "", "billable": True})
+        added[key] = {"project": guess, "charge": "", "billable": True}
+
+    if not added:
+        print(f"nothing new: all {len(known)} source dirs are already mapped.")
+        return
+    # Hours first, so the ones worth naming are obvious and a long tail of
+    # zero-hour directories can be ignored.
+    hi = datetime.combine(date.today() + timedelta(days=1), time())
+    lo = hi - timedelta(days=90)
+    norm, _, _ = allocate(scan_transcripts(cfg, lo, hi), lo, hi)
+    hours = defaultdict(float)
+    for k, mins in norm.items():
+        hours[dir_key(k)] += mins
+
+    verb = "would add" if dry_run else "added"
+    print(f"{verb} {len(added)} source dir(s), by hours in the last 90 days:")
+    for key in sorted(added, key=lambda k: -hours.get(k, 0)):
+        print(f"  {q(cfg, hours.get(key, 0)):7.2f} h  {key}")
+    if dry_run:
+        print(f"\nnothing written. Re-run without --dry-run to add these to "
+              f"{CONFIG_REL}, then fill in project names and charge codes.")
+        return
+    cfg["projects"].update(added)
     os.makedirs(os.path.dirname(cfg_path()), exist_ok=True)
     with open(cfg_path(), "w") as fh:
         json.dump(cfg, fh, indent=2, sort_keys=True)
-    print(f"wrote {cfg_path()} with {len(cfg['projects'])} source dirs; "
-          f"fill in project names + charge codes.")
+    print(f"\nwrote {cfg_path()} ({len(cfg['projects'])} source dirs). "
+          f"Fill in project names + charge codes for the new ones.")
 
 
 def selftest():
@@ -667,6 +745,14 @@ def selftest():
                        "-repo--claude-worktrees-x-ab12": {"project": "X", "charge": "C2"}}}
     assert resolve(wt, "-repo--claude-worktrees-x-ab12")[0] == "X"   # worktree entry wins
     assert resolve(wt, "-repo--claude-worktrees-y-cd34")[0] == "R"   # falls back to the repo
+
+    # every scratch workspace is the SAME key, so it is mapped once not daily
+    s1 = dir_key("-Users-g" + SCRATCH_MARK + "aaa-scratch-2026-09-27-28dfe2")
+    s2 = dir_key("-Users-g" + SCRATCH_MARK + "bbb-scratch-2026-09-02-6217a1")
+    assert s1 == s2, (s1, s2)
+    assert s1 == "-Users-g" + SCRATCH_MARK.rstrip("-")
+    # and an ordinary dir is untouched by that rule
+    assert dir_key("-Users-g-vscode-orrery") == "-Users-g-vscode-orrery"
     assert period_bounds(cfg, date(2026, 1, 6)) == (date(2026, 1, 1), date(2026, 1, 16))
     assert period_bounds(cfg, date(2026, 1, 16)) == (date(2026, 1, 16), date(2026, 2, 1))
     assert period_bounds(cfg, date(2026, 2, 28)) == (date(2026, 2, 16), date(2026, 3, 1))
@@ -696,6 +782,16 @@ def selftest():
     assert not _has_user_text(mk("<system-reminder>noise</system-reminder>"))
     assert not _has_user_text(json.dumps({"type": "assistant", "message": {"content": "hi"}}))
     assert not _has_user_text("not json at all")
+
+    # a program driving Claude is not Gilly working, however real its user turn
+    assert _is_sdk_driven(json.dumps({"entrypoint": "sdk-cli"}))
+    # promptSource is "sdk" on ordinary desktop sessions, so it must NOT count
+    assert not _is_sdk_driven(json.dumps({"promptSource": "sdk"}))
+    assert not _is_sdk_driven(json.dumps({"entrypoint": "claude-desktop",
+                                          "promptSource": "sdk"}))
+    assert not _is_sdk_driven(json.dumps({"entrypoint": "claude-desktop"}))
+    assert not _is_sdk_driven(json.dumps({"entrypoint": "cli"}))
+    assert not _is_sdk_driven("not json at all")
 
     # summarise() and render() must agree: one computation, two formatters
     s = summarise(dict(cfg, target_hours_per_week=30), lo, hi)
@@ -747,13 +843,15 @@ def main():
                     help="project x day matrix instead of one total (week/period)")
     ap.add_argument("--json", action="store_true",
                     help="emit the numbers as JSON instead of markdown")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="with init: list what would be added, write nothing")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
     if args.mode == "init":
-        return cmd_init()
+        return cmd_init(dry_run=args.dry_run)
 
     cfg = load_config()
     day = date.fromisoformat(args.date) if args.date else date.today()
